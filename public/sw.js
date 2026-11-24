@@ -1,30 +1,56 @@
 // Arena Verde — service worker: funciona offline e pega versões novas automaticamente.
-const V = 'arenaverde-v6';
-const SHELL = ['/', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/icon-maskable-512.png', '/icons/apple-touch-icon.png',
-  ...['rifle', 'grenade', 'tank', 'missile', 'mine', 'wire'].flatMap((k) => [`/cards/art-${k}.jpg`, `/cards/card-${k}.jpg`])];
+const V = "arenaverde-v7";
+const SHELL = [
+  "/",
+  "/style.css",
+  "/game.js",
+  "/manifest.webmanifest",
+  "/icons/icon-192.png",
+  "/icons/icon-512.png",
+  "/icons/icon-maskable-512.png",
+  "/icons/apple-touch-icon.png",
+  ...["rifle", "grenade", "tank", "missile", "mine", "wire"].flatMap((k) => [
+    `/assets/cards/art-${k}.jpg`,
+    `/assets/cards/card-${k}.jpg`,
+    `/assets/sprites/${k}.png`,
+  ]),
+  ...["normal", "runner", "armored", "spitter", "boss"].map((k) => `/assets/sprites/z_${k}.png`),
+];
 
-self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(V).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
-});
-
-self.addEventListener('activate', (e) => {
+self.addEventListener("install", (e) => {
   e.waitUntil(
-    caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== V).map((k) => caches.delete(k)))).then(() => self.clients.claim())
+    caches
+      .open(V)
+      .then((c) => c.addAll(SHELL))
+      .then(() => self.skipWaiting()),
   );
 });
 
-self.addEventListener('fetch', (e) => {
+self.addEventListener("activate", (e) => {
+  e.waitUntil(
+    caches
+      .keys()
+      .then((ks) => Promise.all(ks.filter((k) => k !== V).map((k) => caches.delete(k))))
+      .then(() => self.clients.claim()),
+  );
+});
+
+self.addEventListener("fetch", (e) => {
   const req = e.request;
-  if (req.method !== 'GET') return;
+  if (req.method !== "GET") return;
   const url = new URL(req.url);
-  if (url.origin === location.origin && url.pathname.startsWith('/api/')) return; // ranking sempre online
+  if (url.origin === location.origin && url.pathname.startsWith("/api/")) return; // ranking sempre online
 
   // Página: rede primeiro (pega atualizações), cache se estiver offline
-  if (req.mode === 'navigate') {
+  if (req.mode === "navigate") {
     e.respondWith(
       fetch(req)
-        .then((res) => { const cp = res.clone(); caches.open(V).then((c) => c.put('/', cp)); return res; })
-        .catch(() => caches.match('/'))
+        .then((res) => {
+          const cp = res.clone();
+          caches.open(V).then((c) => c.put("/", cp));
+          return res;
+        })
+        .catch(() => caches.match("/")),
     );
     return;
   }
@@ -34,10 +60,16 @@ self.addEventListener('fetch', (e) => {
     e.respondWith(
       caches.match(req).then((hit) => {
         const net = fetch(req)
-          .then((res) => { if (res.ok || res.type === 'opaque') { const cp = res.clone(); caches.open(V).then((c) => c.put(req, cp)); } return res; })
+          .then((res) => {
+            if (res.ok || res.type === "opaque") {
+              const cp = res.clone();
+              caches.open(V).then((c) => c.put(req, cp));
+            }
+            return res;
+          })
           .catch(() => hit);
         return hit || net;
-      })
+      }),
     );
   }
 });
