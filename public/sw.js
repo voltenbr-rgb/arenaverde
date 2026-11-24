@@ -5,6 +5,7 @@ const SHELL = [
   "/style.css",
   "/game.js",
   "/manifest.webmanifest",
+  "/assets/maps/arena.jpg",
   "/icons/icon-192.png",
   "/icons/icon-512.png",
   "/icons/icon-maskable-512.png",
