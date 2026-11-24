@@ -1,5 +1,5 @@
 // Arena Verde — service worker: funciona offline e pega versões novas automaticamente.
-const V = "arenaverde-v8";
+const V = "arenaverde-v9";
 const SHELL = [
   "/",
   "/style.css",
@@ -56,7 +56,23 @@ self.addEventListener("fetch", (e) => {
     return;
   }
 
-  // Arquivos do jogo e fonte: cache primeiro, atualizando em segundo plano
+  // Código do jogo (js, css, manifest): rede primeiro, para as atualizações aparecerem na hora.
+  // Sem internet, usa a cópia guardada.
+  const isCode = url.origin === location.origin && /\.(js|css|webmanifest)$/.test(url.pathname);
+  if (isCode) {
+    e.respondWith(
+      fetch(req, { cache: "no-cache" })
+        .then((res) => {
+          const cp = res.clone();
+          caches.open(V).then((c) => c.put(req, cp));
+          return res;
+        })
+        .catch(() => caches.match(req, { ignoreSearch: true })),
+    );
+    return;
+  }
+
+  // Imagens e fonte: cache primeiro (não mudam), atualizando em segundo plano
   if (url.origin === location.origin || /fonts\.(googleapis|gstatic)\.com$/.test(url.hostname)) {
     e.respondWith(
       caches.match(req).then((hit) => {

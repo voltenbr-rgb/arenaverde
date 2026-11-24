@@ -3227,8 +3227,15 @@
   showMenu();
   requestAnimationFrame(frame);
   syncFromServer();
+  var reloaded = false; // recarrega uma vez quando uma versão nova do app assume
   try {
     if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost"))
-      navigator.serviceWorker.register("/sw.js").catch(() => {});
+      (navigator.serviceWorker.addEventListener("controllerchange", () => {
+        if (!reloaded && state !== "play") {
+          reloaded = true;
+          location.reload();
+        }
+      }),
+      navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" })).catch(() => {});
   } catch (e) {}
 }
