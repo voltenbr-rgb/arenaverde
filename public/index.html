@@ -109,9 +109,20 @@ details.how{margin-top:12px}details.how summary{cursor:pointer;color:var(--gold)
   #banner{top:30%}
 }
 @media (max-width:430px){.ic{display:none}.sq{width:36px;height:40px;font-size:9px}.stat span{font-size:7px}.stat b{font-size:11px}.card .nm{font-size:7px}}
-@media (orientation:landscape) and (max-height:520px){
-  .card canvas{width:30px;height:30px}.card .st,.card .key{display:none}.card .nm{min-height:0}.card{padding:3px;gap:3px}
-  #hud{padding:3px 6px}.stat b{font-size:12px}.sq{height:34px}#app{gap:4px;padding:4px}
+@media (orientation:landscape) and (max-height:560px){
+  #app{display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);gap:4px;padding:4px max(4px,env(safe-area-inset-right)) 4px max(4px,env(safe-area-inset-left))}
+  #hud{grid-column:1/-1;padding:3px 5px;gap:4px}
+  .logo,.stat span{display:none}.stat{padding:2px 6px;gap:6px}.stat b{font-size:12px}.ic svg{width:15px;height:15px}.sq{width:36px;height:30px;font-size:9px}
+  #deck{grid-column:1;grid-row:2;display:flex;flex-direction:column;gap:3px;padding:4px;overflow-y:auto;scrollbar-width:none}
+  .card{flex:1 1 0;flex-direction:row;justify-content:flex-start;padding:2px 8px 2px 18px;gap:6px;min-height:34px;max-height:64px}
+  .card canvas{width:clamp(22px,7vh,34px);height:clamp(22px,7vh,34px)}
+  .card .nm,.card .st,.card .hpb{display:none}.card .cost{font-size:10px;white-space:nowrap}
+  .card .badge{width:13px;height:13px;font-size:6px;top:50%;left:3px;transform:translateY(-50%)}
+  .card.sel{transform:translateX(4px)}
+  .card .cd{top:0;bottom:auto}
+  #stage{grid-column:2;grid-row:2}
+  #banner{top:40%}
+}
 }
 @media (prefers-reduced-motion:reduce){#banner,.card{transition:none}.card.nope,#hLife.low{animation:none}}
 </style>
@@ -572,7 +583,7 @@ function drawScene(){const c=$('scene');if(!c)return;const x=c.getContext('2d'),
  sb(SP.mortar,40,99);sb(SP.rifle,62,99);sb(SP.grenade,84,99);sb(SP.tank,110,99);sb(SP.mg,138,99);sb(SP.missile,160,99)}
 
 /* ---------- layout + loop ---------- */
-function fit(){const st=$('stage');const aw=st.clientWidth-10,ah=st.clientHeight-12;let s=Math.min(aw/W,ah/H);if(s>=2)s=Math.floor(s);s=Math.max(s,.4);cv.style.width=fxc.style.width=Math.floor(W*s)+'px';cv.style.height=fxc.style.height=Math.floor(H*s)+'px';CSS_S=s;const nf=Math.max(2,Math.min(4,Math.ceil(s*(devicePixelRatio||1))));if(nf!==FS||!vign){FS=nf;fxc.width=W*FS;fxc.height=H*FS;buildVign()}}
+function fit(){const st=$('stage');const aw=st.clientWidth-10,ah=st.clientHeight-12;const dpr=devicePixelRatio||1;let s=Math.min(aw/W,ah/H);s=Math.max(s>=4?Math.floor(s):Math.floor(s*dpr*8)/(dpr*8),.4);cv.style.width=fxc.style.width=Math.floor(W*s)+'px';cv.style.height=fxc.style.height=Math.floor(H*s)+'px';CSS_S=s;const nf=Math.max(2,Math.min(4,Math.ceil(s*(devicePixelRatio||1))));if(nf!==FS||!vign){FS=nf;fxc.width=W*FS;fxc.height=H*FS;buildVign()}}
 const ro=new ResizeObserver(fit);ro.observe($('stage'));fit();
 let last=performance.now();
 function frame(now){const rdt=Math.min(.05,(now-last)/1000);last=now;let dt=rdt;if(slowT>0){slowT-=rdt;dt*=.3}
