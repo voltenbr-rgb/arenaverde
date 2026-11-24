@@ -658,7 +658,7 @@ details.how summary::before {
   #stage {
     flex: none;
     width: 100%;
-    aspect-ratio: 262/126;
+    aspect-ratio: 1230/732;
     max-height: 60dvh;
   }
   #deck {
@@ -874,4 +874,26 @@ details.how summary::before {
   object-fit: contain;
   background: #1d2215;
   padding: 6px;
+}
+
+/* dica para girar o celular (o modo principal é deitado) */
+#rotate {
+  display: none;
+}
+@media (orientation: portrait) and (pointer: coarse) {
+  #rotate {
+    display: block;
+    position: absolute;
+    left: 50%;
+    bottom: 6px;
+    transform: translateX(-50%);
+    z-index: 3;
+    font-size: 8px;
+    color: var(--gold);
+    background: rgba(13, 18, 8, 0.85);
+    border: 2px solid #000;
+    padding: 6px 8px;
+    white-space: nowrap;
+    pointer-events: none;
+  }
 }

@@ -12,9 +12,50 @@
     GRID_END = GX + COLS * CELL,
     W = GRID_END + RIGHT,
     H = ROWS * CELL;
-  cv.width = W;
-  cv.height = H;
+  cv.width = 1230;
+  cv.height = 732;
   ctx.imageSmoothingEnabled = false;
+
+  /* ---------- câmera isométrica ----------
+     Tela virtual = tamanho do cenário (assets/maps/arena.jpg). ISO = canto do tabuleiro
+     (coluna 0, linha 0) e vetores de uma casa ao longo da linha (c) e entre linhas (r). */
+  const CAM = { x: 40, y: 58 }; // recorte do cenário (aproxima a câmera do tabuleiro)
+  const VW = 1310 - 2 * CAM.x,
+    VH = 830 - CAM.y - 40;
+  const ISO = { ox: 108 - CAM.x, oy: 522 - CAM.y, cx: 76.5, cy: -41.6, rx: 76.3, ry: 41.9 };
+  const K = Math.hypot(ISO.cx, ISO.cy) / CELL; // unidades de tela por unidade da grade
+  const LANE_ANG = Math.atan2(ISO.cy, ISO.cx); // inclinação das linhas na tela
+  const laneY = (r) => r * CELL + CELL / 2; // centro da linha r
+  const rowOf = (y) => Math.max(0, Math.min(ROWS - 1, Math.floor(y / CELL)));
+  // ponto do chão da grade -> tela
+  const iso = (x, y) => {
+    const u = (x - GX) / CELL,
+      v = y / CELL;
+    return [ISO.ox + u * ISO.cx + v * ISO.rx, ISO.oy + u * ISO.cy + v * ISO.ry];
+  };
+  // ponto da grade com altura embutida no y (como no jogo 2D) -> tela
+  const scr = (x, y, row = rowOf(y)) => {
+    const [sx, sy] = iso(x, laneY(row));
+    return [sx, sy - (row * CELL + CELL - 2 - y) * K];
+  };
+  // tela -> grade (para o toque/clique)
+  const unproject = (sx, sy) => {
+    const det = ISO.cx * ISO.ry - ISO.rx * ISO.cy,
+      X = sx - ISO.ox,
+      Y = sy - ISO.oy;
+    return { x: GX + ((ISO.ry * X - ISO.rx * Y) / det) * CELL, y: ((-ISO.cy * X + ISO.cx * Y) / det) * CELL };
+  };
+  // efeitos (partículas) vivem no espaço da tela dividido por K
+  const toFx = (x, y, row) => {
+    const [sx, sy] = scr(x, y, row);
+    return [sx / K, sy / K];
+  };
+  let MAPIMG = null;
+  {
+    const im = new Image();
+    im.onload = () => (MAPIMG = im);
+    im.src = "assets/maps/arena.jpg";
+  }
 
   /* ---------- pixel art (original, gerado em código) ---------- */
   const PAL = {
@@ -1092,8 +1133,10 @@
   }
 
   /* ---------- efeitos ---------- */
-  function part(x, y, vx, vy, life, col, s = 1, g = 0) {
-    parts.push({ x, y, vx, vy, life, max: life, col, s, g });
+  // partícula em pixel: nasce num ponto da grade e vive no espaço da tela (÷K)
+  function part(x, y, vx, vy, life, col, s = 1, g = 0, row) {
+    const [px, py] = toFx(x, y, row);
+    parts.push({ x: px, y: py, vx, vy, life, max: life, col, s, g });
   }
   const fxc = $("fx"),
     fx = fxc.getContext("2d");
@@ -1133,7 +1176,15 @@
     slowT = 0,
     ambT = 0;
   const rnd = (a, b) => a + Math.random() * (b - a);
+  // efeito: converte a posição da grade para o espaço da tela (÷K); o.row força a linha
   function add(o) {
+    const row = o.row != null ? o.row : rowOf(o.y);
+    if (o.gy != null) {
+      o.lx = o.x; // ponto do chão (para a mancha no decal)
+      o.ly = laneY(row) + rnd(-4, 4);
+      o.gy = toFx(o.x, o.gy, row)[1];
+    }
+    [o.x, o.y] = toFx(o.x, o.y, row);
     fxs.push(o);
     if (fxs.length > 1200) fxs.splice(0, fxs.length - 1200);
   }
@@ -1248,7 +1299,7 @@
         drag: 0.5,
         ember: rnd(0, 6),
       });
-    scorch(x, y + 3, 4 * k);
+    scorch(x, laneY(rowOf(y)) + 1, 4 * k);
   }
   function muzzle(x, y, s = 1) {
     G(GL.y, x + 2 * s, y, { r0: 3 * s, r1: 5 * s, life: 0.07 });
@@ -1287,8 +1338,9 @@
       });
     G(GL.g, x, y, { r0: 2, r1: 7, life: 0.12, a: 0.45 });
   }
-  function txt(x, y, v, col = "255,236,150") {
+  function txt(x, y, v, col = "255,236,150", row) {
     add({
+      row,
       k: "t",
       x: x + rnd(-3, 3),
       y,
@@ -1324,7 +1376,7 @@
           p.y = p.gy;
           if (p.blood && !p.sp) {
             p.sp = 1;
-            splat(p.x, p.y);
+            splat(p.lx + rnd(-2, 2), p.ly);
           }
           p.vy *= -0.3;
           p.vx *= 0.55;
@@ -1359,33 +1411,34 @@
   function drawFx(sx, sy) {
     fx.setTransform(1, 0, 0, 1, 0, 0);
     fx.clearRect(0, 0, fxc.width, fxc.height);
-    fx.setTransform(FS, 0, 0, FS, sx * FS, sy * FS);
-    // projéteis com luz
+    fx.setTransform(FS * K, 0, 0, FS * K, sx * FS, sy * FS); // espaço dos efeitos = tela ÷ K
+    // projéteis com luz (rastro na direção da linha)
     fx.globalCompositeOperation = "lighter";
+    const ldx = Math.cos(LANE_ANG),
+      ldy = Math.sin(LANE_ANG);
     for (const p of proj) {
-      const x = p.x,
-        y = p.y;
+      const [x, y] = toFx(p.x, p.y, p.row);
       if (p.k === "bullet") {
         fx.globalAlpha = 1;
         fx.strokeStyle = "rgba(255,225,140,.95)";
         fx.lineWidth = 0.8;
         fx.beginPath();
-        fx.moveTo(x - 9, y + 0.5);
-        fx.lineTo(x, y + 0.5);
+        fx.moveTo(x - 9 * ldx, y - 9 * ldy);
+        fx.lineTo(x, y);
         fx.stroke();
-        fx.drawImage(GL.y, x - 2.5, y - 2, 5, 5);
+        fx.drawImage(GL.y, x - 2.5, y - 2.5, 5, 5);
       } else if (p.k === "shell") {
         fx.strokeStyle = "rgba(255,160,60,.9)";
         fx.lineWidth = 1.2;
         fx.beginPath();
-        fx.moveTo(x - 12, y + 0.5);
-        fx.lineTo(x, y + 0.5);
+        fx.moveTo(x - 12 * ldx, y - 12 * ldy);
+        fx.lineTo(x, y);
         fx.stroke();
         fx.drawImage(GL.o, x - 4, y - 3.5, 8, 8);
       } else if (p.k === "missile") {
         const f = rnd(0.8, 1.3);
-        fx.drawImage(GL.o, x - 9 - 4 * f, y - 4 * f + 0.5, 8 * f, 8 * f);
-        fx.drawImage(GL.w, x - 7 - 1.5, y - 1, 3, 3);
+        fx.drawImage(GL.o, x - 8 * ldx - 4 * f, y - 8 * ldy - 4 * f, 8 * f, 8 * f);
+        fx.drawImage(GL.w, x - 7 * ldx - 1.5, y - 7 * ldy - 1.5, 3, 3);
         fx.globalAlpha = 0.35;
         fx.drawImage(GL.gs, x - 20, y - 14, 28, 28);
         fx.globalAlpha = 1;
@@ -1396,8 +1449,8 @@
         fx.strokeStyle = "rgba(255,200,120,.95)";
         fx.lineWidth = 0.8;
         fx.beginPath();
-        fx.moveTo(x, y + 0.5);
-        fx.lineTo(x + 9, y + 0.5);
+        fx.moveTo(x, y);
+        fx.lineTo(x + 9 * ldx, y + 9 * ldy);
         fx.stroke();
         fx.drawImage(GL.o, x - 2.5, y - 2, 5, 5);
       } else if (p.k === "gren" && ((p.t * 20) | 0) % 2) {
@@ -1483,12 +1536,12 @@
     x.fillRect(0, 0, w, h);
     vign = c;
   }
-  function coins(x, y) {
+  function coins(x, y, row) {
     for (let i = 0; i < 5; i++)
-      part(x, y, (Math.random() - 0.5) * 30, -40 - Math.random() * 25, 0.6, "#f2c230", 1, 120);
+      part(x, y, (Math.random() - 0.5) * 30, -40 - Math.random() * 25, 0.6, "#f2c230", 1, 120, row);
   }
   function zy(z) {
-    return z.row * CELL + CELL - 1 - (z.d.big ? 0 : 8);
+    return z.row * CELL + CELL - 2 - (z.d.big ? 18 : 8); // meio do corpo
   }
   function hurt(z, d, quiet) {
     if (z.dead) return;
@@ -1498,7 +1551,7 @@
       z.fl = 0.07;
       gore(z.x, y, 3);
       sfx("squish");
-      if (d >= 40) txt(z.x, y - 10, d);
+      if (d >= 40) txt(z.x, y - 10, d, undefined, z.row);
       if (!z.d.big && d >= 25) {
         z.x += d >= 60 ? 3 : 1.2;
         z.stun = d >= 60 ? 0.25 : 0.1;
@@ -1518,7 +1571,7 @@
         t: 0,
       });
       coins(z.x, y - 4);
-      txt(z.x, y - 16, "+$" + z.d.cash, "140,235,90");
+      txt(z.x, y - 16, "+$" + z.d.cash, "140,235,90", z.row);
       sfx("hit");
       if (z.d.big) {
         boom(z.x, y, 3);
@@ -1620,10 +1673,13 @@
     crateT -= dt;
     if (crateT <= 0) {
       crateT = 9 + Math.random() * 6;
+      const row = (Math.random() * ROWS) | 0,
+        ty = row * CELL + CELL - 2;
       crates.push({
         x: GX + 12 + Math.random() * (COLS * CELL - 24),
-        y: -10,
-        ty: 16 + Math.random() * (H - 26),
+        row,
+        y: ty - 60, // cai de paraquedas (altura)
+        ty,
         land: false,
         life: 9,
       });
@@ -1634,7 +1690,7 @@
         if (c.y >= c.ty) {
           c.y = c.ty;
           c.land = true;
-          puff(c.x, c.y + 3, 5);
+          puff(c.x, c.ty - 1, 5);
         }
       } else c.life -= dt;
     }
@@ -1782,7 +1838,8 @@
         const f = Math.min(1, p.t / p.T);
         p.x = p.x0 + (p.tx - p.x0) * f;
         p.y = p.y0 + (p.ty - p.y0) * f - Math.sin(f * Math.PI) * 70;
-        if (Math.random() < 0.6) G(GL.sl, p.x, p.y, { add: false, a: 0.25, smoke: 1, r0: 0.8, r1: 3, life: 0.6 });
+        if (Math.random() < 0.6)
+          G(GL.sl, p.x, p.y, { add: false, a: 0.25, smoke: 1, r0: 0.8, r1: 3, life: 0.6, row: p.row });
         if (f >= 1) {
           splash(p.row, p.x, p.splash, p.dmg);
           boom(p.x, p.ty, 1.4);
@@ -1792,7 +1849,8 @@
       }
       if (p.k === "gren") {
         p.t += dt;
-        if (Math.random() < 0.5) G(GL.sl, p.x, p.y, { add: false, a: 0.25, smoke: 1, r0: 0.8, r1: 3, life: 0.5 });
+        if (Math.random() < 0.5)
+          G(GL.sl, p.x, p.y, { add: false, a: 0.25, smoke: 1, r0: 0.8, r1: 3, life: 0.5, row: p.row });
         const f = Math.min(1, p.t / p.T);
         p.x = p.x0 + (p.tx - p.x0) * f;
         p.y = p.y0 + (p.ty - p.y0) * f - Math.sin(f * Math.PI) * 26;
@@ -2006,7 +2064,7 @@
               z.lf = fi;
               if (fi % 2 === 0 && z.x < GRID_END) {
                 trauma = Math.min(1, trauma + 0.07);
-                puff(z.x, z.row * CELL + CELL, 4);
+                puff(z.x, z.row * CELL + CELL - 2, 4);
                 sfx("stomp");
               }
             }
@@ -2046,29 +2104,38 @@
     if (parts.length > 600) parts.splice(0, parts.length - 600);
   }
 
-  /* ---------- desenho ---------- */
-  function draw(img, cx, bottom, fl, a = 1) {
-    const x = Math.round(cx - img.width / 2),
-      y = Math.round(bottom - img.height);
-    ctx.globalAlpha = a;
-    ctx.drawImage(img, x, y);
-    if (fl > 0) {
-      ctx.globalAlpha = 0.75 * a;
-      ctx.drawImage(wht(img), x, y);
-    }
-    ctx.globalAlpha = 1;
+  /* ==========================================================================
+     DESENHO — VISTA ISOMÉTRICA
+     A lógica do jogo continua em coordenadas "da grade" (x ao longo da linha,
+     y atravessando as linhas). Aqui tudo é projetado no tabuleiro inclinado:
+       • chão (grama, crateras, destaque da casa): transformação afim do canvas
+       • bonecos, projéteis e caixas: em pé, no ponto projetado, ordenados por profundidade
+     ========================================================================== */
+  function groundTransform() {
+    // grade -> tela: (x,y) vira O + (x-GX)/CELL·C + y/CELL·R
+    const a = ISO.cx / CELL,
+      b = ISO.cy / CELL,
+      c = ISO.rx / CELL,
+      d = ISO.ry / CELL;
+    ctx.setTransform(FS * a, FS * b, FS * c, FS * d, FS * (ISO.ox - GX * a), FS * (ISO.oy - GX * b));
   }
+  // desenha coisas em pixel art com escala K, com a origem no ponto (sx,sy) da tela
+  function at(sx, sy, s = K) {
+    ctx.setTransform(FS * s, 0, 0, FS * s, FS * sx, FS * sy);
+  }
+  const screenT = () => ctx.setTransform(FS, 0, 0, FS, 0, 0);
+
   function bar(cx, y, hp, max) {
     if (hp >= max) return;
-    const w = 12,
+    const w = 12 * K,
       f = Math.max(0, hp / max);
     ctx.fillStyle = "#000";
-    ctx.fillRect((cx - w / 2 - 1) | 0, y - 1, w + 2, 3);
+    ctx.fillRect(cx - w / 2 - K, y - K, w + 2 * K, 3 * K);
     ctx.fillStyle = f > 0.5 ? "#6ee04a" : f > 0.25 ? "#f2c230" : "#e0533a";
-    ctx.fillRect((cx - w / 2) | 0, y, Math.ceil(w * f), 1);
+    ctx.fillRect(cx - w / 2, y, w * f, K);
   }
-  /* Desenha um SPRITE DE AÇÃO (PNG) com a base em (cx,bottom), altura h em unidades da grade.
-     O canvas roda em alta resolução, então o PNG fica nítido — nunca usamos a arte da carta aqui. */
+  /* Desenha um SPRITE DE AÇÃO (PNG) com a base em (cx,bottom) da tela e altura h (unidades de tela).
+     Nunca usamos a arte da carta aqui. */
   function drawImg(im, cx, bottom, h, o = {}) {
     const w = (im.width * h) / im.height;
     ctx.save();
@@ -2086,35 +2153,57 @@
     ctx.restore();
     return w;
   }
+  // sprite em pixel art (cartas extras sem PNG): ampliado K vezes, sem suavizar
+  function drawPix(img, cx, bottom, fl, a = 1) {
+    ctx.save();
+    at(cx - (img.width * K) / 2, bottom - img.height * K);
+    ctx.imageSmoothingEnabled = false;
+    ctx.globalAlpha = a;
+    ctx.drawImage(img, 0, 0);
+    if (fl > 0) {
+      ctx.globalAlpha = 0.75 * a;
+      ctx.drawImage(wht(img), 0, 0);
+    }
+    ctx.restore();
+  }
   function shadow(x, y, rx) {
-    ctx.fillStyle = "rgba(0,0,0,.25)";
+    ctx.fillStyle = "rgba(0,0,0,.28)";
     ctx.beginPath();
-    ctx.ellipse(x, y, rx, 1.6, 0, 0, 7);
+    ctx.ellipse(x, y, rx, rx * 0.42, 0, 0, 7);
     ctx.fill();
   }
-  // Ponto de saída do tiro de cada unidade (relativo ao centro da casa e ao chão)
-  const MUZZLE = {
+  /* Saída do tiro de cada unidade, medida no sprite (unidades da grade: dx à frente, dy para cima).
+     Convertida para a grade levando em conta a diagonal da linha. */
+  const MUZZLE_SPR = {
     rifle: [12.5, -12],
     missile: [9, -18.5],
-    tank: [17, -13],
+    tank: [16, -14],
     grenade: [9, -14],
     mg: [12, -7],
     mortar: [7, -13],
   };
+  const MUZZLE = {};
+  for (const k in MUZZLE_SPR) {
+    const [dx, dy] = MUZZLE_SPR[k],
+      u = (dx * K) / (ISO.cx / CELL), // avanço ao longo da linha
+      h = ((u * ISO.cy) / CELL - dy * K) / K; // altura que sobra
+    MUZZLE[k] = [u, -h];
+  }
   // Cano do tanque: na arte original ele fica atrás da explosão, então é desenhado aqui (e recua ao atirar)
-  function drawBarrel(u, b, rx) {
-    const h = SPRITE_H.tank,
-      x0 = u.x + 6 + rx,
-      len = 11 - (u.rec > 0.1 ? 2.5 : 0),
-      y = b - h * 0.7;
+  function drawBarrel(u, sx, sy, rx) {
+    const len = 11 - (u.rec > 0.1 ? 2.5 : 0);
+    ctx.save();
+    at(sx + rx + 5 * K, sy - SPRITE_H.tank * 0.7 * K);
+    ctx.rotate(LANE_ANG * 0.6);
     ctx.fillStyle = "#1d2410";
-    ctx.fillRect(x0, y - 1.2, len + 0.6, 2.6);
+    ctx.fillRect(0, -1.2, len + 0.6, 2.6);
     ctx.fillStyle = "#5d6a32";
-    ctx.fillRect(x0, y - 0.6, len, 1.4);
+    ctx.fillRect(0, -0.6, len, 1.4);
     ctx.fillStyle = "#8a9a52";
-    ctx.fillRect(x0, y - 0.6, len, 0.45);
+    ctx.fillRect(0, -0.6, len, 0.45);
     ctx.fillStyle = "#1d2410";
-    ctx.fillRect(x0 + len - 1.6, y - 1.6, 2.2, 3.4);
+    ctx.fillRect(len - 1.6, -1.6, 2.2, 3.4);
+    ctx.restore();
   }
   function frameOf(u) {
     const F = FR[u.type];
@@ -2142,76 +2231,50 @@
     return (u.t + (u.seed || 0)) % 3.4 < 0.13 ? F.blink : F.idle;
   }
   function drawUnit(u, ghost) {
-    const im = IMG[u.type];
+    const [sx, sy] = iso(u.x, laneY(u.row)),
+      im = IMG[u.type],
+      atk = u.rec > 0 || u.throwT > 0 || u.wind > 0,
+      still = u.type === "tank" || u.type === "mine" || u.type === "wire",
+      rx = (u.rec > 0 ? (u.type === "tank" ? -1.5 : -1) : 0) * K,
+      a = ghost ? 0.5 : u.type === "mine" && u.arm > 0 ? 0.6 : 1;
+    if (!ghost && u.type !== "mine") shadow(sx, sy, (u.type === "tank" ? 12 : u.type === "wire" ? 9 : 7) * K);
+    let top;
     if (im) {
       // 2 frames: PARADO (respira) e ATACANDO (recuo + leve esticada)
-      const b = u.row * CELL + CELL - 2,
-        h = SPRITE_H[u.type],
-        atk = u.rec > 0 || u.throwT > 0 || u.wind > 0,
-        still = u.type === "tank" || u.type === "mine" || u.type === "wire",
-        rx = u.rec > 0 ? (u.type === "tank" ? -1.5 : -1) : 0,
-        a = ghost ? 0.5 : u.type === "mine" && u.arm > 0 ? 0.6 : 1;
+      const h = SPRITE_H[u.type] * K;
       let rot = 0;
       if (u.wind > 0) rot = -0.1;
       else if (u.throwT > 0) rot = 0.08;
-      if (!ghost && u.type !== "mine") shadow(u.x, b - 0.4, u.type === "tank" ? 11 : u.type === "wire" ? 8 : 6);
       const breathe = 1 + Math.sin((u.t + (u.seed || 0)) * 3) * 0.015;
-      drawImg(im, u.x + rx, b + (u.type === "tank" && !u.rec ? (((u.t * 12) | 0) % 2) * 0.35 : 0), h, {
+      drawImg(im, sx + rx, sy + (u.type === "tank" && !u.rec ? (((u.t * 12) | 0) % 2) * 0.35 * K : 0), h, {
         fl: u.fl,
         a,
         rot,
         sx: still ? 1 : atk ? 1.04 : 1,
         sy: still ? 1 : atk ? 0.96 : breathe,
       });
-      if (u.type === "tank") drawBarrel(u, b, rx);
-      if (u.type === "mine" && !ghost && u.arm <= 0 && ((u.t * 3) | 0) % 2) {
-        ctx.fillStyle = "#ff3b2a";
-        ctx.fillRect(u.x - 0.75, b - h + 0.6, 1.5, 1);
-      }
-      if (!ghost) bar(u.x, b - h - 3, u.hp, u.max);
-      return;
-    }
-    const b = u.row * CELL + CELL - 2,
-      bob =
-        u.type === "tank"
-          ? (((u.t * 12) | 0) % 2) * (u.rec > 0 ? 0 : 1) - 0
-          : u.type === "mine" || u.type === "wire"
-            ? 0
-            : (u.t + (u.seed || 0)) % 1.6 < 0.8
-              ? 0
-              : 1,
-      rx = u.type === "tank" && u.rec > 0.1 ? -2 : 0;
-    if (u.type === "mine") {
-      draw(SP.mine, u.x, b, u.fl, ghost ? 0.5 : u.arm > 0 ? 0.55 : 1);
-      if (!ghost && u.arm <= 0 && ((u.t * 3) | 0) % 2) {
-        ctx.fillStyle = "#ff3b2a";
-        ctx.fillRect(u.x | 0, b - 6, 2, 1);
-      }
+      if (u.type === "tank") drawBarrel(u, sx, sy, rx);
+      top = sy - h;
     } else {
       const img = frameOf(u);
-      ctx.fillStyle = "rgba(0,0,0,.22)";
-      ctx.fillRect((u.x - img.width / 2 + 3) | 0, b - 1, img.width - 6, 2);
-      draw(img, u.x + rx, b + bob, u.fl, ghost ? 0.5 : 1);
-      if (u.rec > 0.04) {
-        ctx.fillStyle = "#fff6b0";
-        const fy = { rifle: b - 7, tank: b - 14, missile: b - 8, mg: b - 8 }[u.type];
-        if (u.type === "rifle" && u.reload > 0) return;
-        if (fy) {
-          const fx = u.x + (u.type === "tank" ? 13 : u.type === "mg" ? 12 : 9);
-          ctx.fillRect(fx, fy, 3, 3);
-          ctx.fillStyle = "#ffb02e";
-          ctx.fillRect(fx + 3, fy + 1, 2, 1);
-        }
-      }
+      drawPix(img, sx + rx, sy, u.fl, a);
+      top = sy - img.height * K;
     }
-    if (!ghost) bar(u.x, b - (u.type === "mine" ? 9 : u.type === "tank" ? 20 : 18), u.hp, u.max);
+    if (u.type === "mine" && !ghost && u.arm <= 0 && ((u.t * 3) | 0) % 2) {
+      ctx.fillStyle = "#ff3b2a";
+      ctx.fillRect(sx - 0.8 * K, top + 0.6 * K, 1.6 * K, K);
+    }
+    if (!ghost) bar(sx, top - 3 * K, u.hp, u.max);
   }
   function drawZ(z) {
-    const im = IMG["z_" + z.type];
+    const [sx, sy0] = iso(z.x, laneY(z.row)),
+      sy = sy0 + (z.d.big ? 2 * K : 0),
+      im = IMG["z_" + z.type];
+    shadow(sx, sy, (z.half + 1.5) * K);
+    let top;
     if (im) {
       // 2 frames de andar (balanço alternado) + mordida (inclina para frente)
-      const b = z.row * CELL + CELL - 1 + (z.d.big ? 2 : 0),
-        h = SPRITE_H["z_" + z.type];
+      const h = SPRITE_H["z_" + z.type] * K;
       let rot = 0,
         dy = 0;
       if (z.bite) rot = -(0.06 + 0.06 * Math.sin(z.t * 18));
@@ -2220,149 +2283,187 @@
       else {
         const ph = Math.sin(z.t * (z.type === "runner" ? 14 : z.d.big ? 5 : 7));
         rot = ph * 0.05;
-        dy = -Math.abs(ph) * 0.8;
+        dy = -Math.abs(ph) * 0.8 * K;
       }
-      shadow(z.x, b - 0.4, z.half + 1);
-      drawImg(im, z.x, b + dy, h, { fl: z.fl, rot });
-      if (!z.d.big) bar(z.x, b - h - 3, z.hp, z.max);
-      return;
+      drawImg(im, sx, sy + dy, h, { fl: z.fl, rot });
+      top = sy - h;
+    } else {
+      const F = ZF[z.type],
+        img = z.bite ? F.bite[((z.t * 6) | 0) % 2] : F.walk[((z.t * 5) | 0) % 4];
+      drawPix(img, sx, sy, z.fl);
+      top = sy - img.height * K;
     }
-    const F = ZF[z.type],
-      fps = z.type === "runner" ? 12 : z.d.big ? 3 : z.type === "armored" ? 4 : 5,
-      img = z.bite ? F.bite[((z.t * 6) | 0) % 2] : F.walk[z.stun > 0 ? 1 : ((z.t * (z.d.big ? 3 : fps)) | 0) % 4],
-      b = z.row * CELL + CELL - 1 + (z.d.big ? 2 : 0);
-    ctx.fillStyle = "rgba(0,0,0,.22)";
-    ctx.fillRect((z.x - z.half) | 0, b - 1, z.half * 2, 2);
-    draw(img, z.x + (z.stun > 0 ? 1 : 0), b, z.fl);
-    bar(z.x, b - img.height - 3, z.hp, z.max);
+    if (!z.d.big) bar(sx, top - 3 * K, z.hp, z.max);
+  }
+  function drawCorpse(c) {
+    const [sx, sy] = iso(c.x, laneY(c.row)),
+      f = Math.min(1, c.t / 0.35);
+    ctx.save();
+    ctx.globalAlpha = c.t > 1.5 ? Math.max(0, 1 - (c.t - 1.5) / 1.1) : 1;
+    ctx.translate(sx, sy + f * f * 2 * K);
+    ctx.rotate(f * f * 1.45);
+    const ch = (c.h || c.img.height) * K,
+      cw = (c.img.width * ch) / c.img.height;
+    ctx.imageSmoothingEnabled = !!c.h;
+    ctx.drawImage(c.img, -cw / 2, -ch, cw, ch);
+    if (c.t < 0.08) {
+      ctx.globalAlpha = 0.8;
+      ctx.drawImage(wht(c.img), -cw / 2, -ch, cw, ch);
+    }
+    ctx.restore();
+  }
+  // pilha de sacos de areia da base, em pé, no começo de cada linha
+  function drawBags(r) {
+    const [sx, sy] = iso(GX - 9, laneY(r));
+    ctx.save();
+    at(sx, sy);
+    for (const [bx, by] of [
+      [-9, -4],
+      [-1, -4],
+      [-5, -8],
+    ]) {
+      ctx.fillStyle = "#141a0e";
+      ctx.fillRect(bx - 0.6, by - 0.6, 9.2, 5.2);
+      ctx.fillStyle = "#b59a62";
+      ctx.fillRect(bx, by, 8, 4);
+      ctx.fillStyle = "#d8c189";
+      ctx.fillRect(bx, by, 8, 1);
+      ctx.fillStyle = "#86703f";
+      ctx.fillRect(bx, by + 3, 8, 1);
+    }
+    ctx.restore();
+  }
+  function drawCrate(c) {
+    if (c.land && c.life < 2.5 && ((c.life * 8) | 0) % 2) return;
+    const [sx, sy] = iso(c.x, laneY(c.row));
+    if (c.land) shadow(sx, sy, 6 * K);
+    ctx.save();
+    at(sx, sy - (c.ty - c.y) * K);
+    if (!c.land) {
+      ctx.fillStyle = "#141a0e";
+      ctx.fillRect(-7, -15, 15, 5);
+      ctx.fillStyle = "#e9e4cc";
+      ctx.fillRect(-6, -14, 13, 3);
+      ctx.fillStyle = "#7f9f40";
+      ctx.fillRect(-2, -14, 5, 3);
+      ctx.fillStyle = "#141a0e";
+      ctx.fillRect(-6, -11, 1, 6);
+      ctx.fillRect(6, -11, 1, 6);
+    }
+    ctx.fillStyle = "#141a0e";
+    ctx.fillRect(-5, -5, 11, 9);
+    ctx.fillStyle = "#9a6a32";
+    ctx.fillRect(-4, -4, 9, 7);
+    ctx.fillStyle = "#f2c230";
+    ctx.fillRect(0, -4, 1, 7);
+    ctx.fillRect(-4, -1, 9, 1);
+    ctx.restore();
+  }
+  function drawProjectile(p) {
+    const [sx, sy] = scr(p.x, p.y, p.row);
+    ctx.save();
+    at(sx, sy);
+    if (p.k === "shell") {
+      ctx.rotate(LANE_ANG);
+      ctx.fillStyle = "#141a0e";
+      ctx.fillRect(-3, -1, 5, 3);
+      ctx.fillStyle = "#c8a040";
+      ctx.fillRect(-2, 0, 4, 1);
+    } else if (p.k === "missile") {
+      ctx.rotate(LANE_ANG);
+      ctx.fillStyle = "#141a0e";
+      ctx.fillRect(-5, -1, 8, 3);
+      ctx.fillStyle = "#cfd3d6";
+      ctx.fillRect(-4, 0, 6, 1);
+      ctx.fillStyle = "#b8322a";
+      ctx.fillRect(2, 0, 1, 1);
+    } else if (p.k === "mort") {
+      ctx.fillStyle = "#141a0e";
+      ctx.fillRect(-2, -3, 4, 6);
+      ctx.fillStyle = "#5c6268";
+      ctx.fillRect(-1, -2, 2, 4);
+    } else if (p.k === "gren") {
+      ctx.fillStyle = "#141a0e";
+      ctx.fillRect(-2, -2, 4, 4);
+      ctx.fillStyle = "#4f6b2a";
+      ctx.fillRect(-1, -1, 2, 2);
+    } else if (p.k === "acid") {
+      ctx.fillStyle = "#2f5a12";
+      ctx.fillRect(-2, -2, 4, 4);
+      ctx.fillStyle = "#9be22d";
+      ctx.fillRect(-1, -1, 2, 2);
+    }
+    ctx.restore();
   }
   function render() {
     ctx.save();
-    ctx.setTransform(FS, 0, 0, FS, 0, 0); // canvas em alta resolução: 1 unidade da grade = FS pixels
-    ctx.imageSmoothingEnabled = false;
+    screenT();
+    ctx.imageSmoothingEnabled = true;
     ctx.fillStyle = "#0b0f07";
-    ctx.fillRect(0, 0, W, H);
+    ctx.fillRect(0, 0, VW, VH);
+    if (MAPIMG) ctx.drawImage(MAPIMG, -CAM.x, -CAM.y, 1310, 830); // cenário (muralhas, torres, barracas)
+    // --- chão do tabuleiro, inclinado
+    ctx.save();
+    groundTransform();
+    ctx.imageSmoothingEnabled = true;
     ctx.drawImage(bg, 0, 0);
     ctx.drawImage(decal, 0, 0);
-    for (const c of corpses) {
-      const f = Math.min(1, c.t / 0.35);
-      ctx.save();
-      ctx.globalAlpha = c.t > 1.5 ? Math.max(0, 1 - (c.t - 1.5) / 1.1) : 1;
-      ctx.translate(c.x, c.b + f * f * 2);
-      ctx.rotate(f * f * 1.45);
-      const ch = c.h || c.img.height,
-        cw = (c.img.width * ch) / c.img.height;
-      ctx.imageSmoothingEnabled = !!c.h;
-      ctx.drawImage(c.img, -cw / 2, -ch, cw, ch);
-      if (c.t < 0.08) {
-        ctx.globalAlpha = 0.8;
-        ctx.drawImage(wht(c.img), -cw / 2, -ch, cw, ch);
+    // marcador da mira do morteiro
+    for (const p of proj)
+      if (p.k === "mort" && ((p.t * 8) | 0) % 2) {
+        ctx.fillStyle = "rgba(255,59,42,.85)";
+        ctx.fillRect(p.tx - 4, p.row * CELL + CELL / 2 - 0.6, 8, 1.2);
+        ctx.fillRect(p.tx - 0.6, p.row * CELL + CELL / 2 - 4, 1.2, 8);
       }
-      ctx.imageSmoothingEnabled = false;
-      ctx.restore();
-    }
+    let ghost = null;
     if (hover && sel && state === "play") {
       const occ = units.find((u) => u.col === hover.c && u.row === hover.r);
       const ok = sel === "shovel" ? !!occ : !occ && money >= U[sel].cost && cardCd[sel] <= 0;
-      ctx.fillStyle = ok ? (sel === "shovel" ? "rgba(255,80,60,.3)" : "rgba(255,255,255,.2)") : "rgba(255,60,40,.22)";
-      ctx.fillRect(GX + hover.c * CELL + 1, hover.r * CELL + 1, CELL - 1, CELL - 1);
+      ctx.fillStyle = ok ? (sel === "shovel" ? "rgba(255,80,60,.35)" : "rgba(255,255,255,.28)") : "rgba(255,60,40,.25)";
+      ctx.fillRect(GX + hover.c * CELL + 0.5, hover.r * CELL + 0.5, CELL - 1, CELL - 1);
       if (ok && sel !== "shovel")
-        drawUnit(
-          {
-            type: sel,
-            x: GX + hover.c * CELL + CELL / 2,
-            y: hover.r * CELL + CELL / 2,
-            row: hover.r,
-            t: 0,
-            rec: 0,
-            fl: 0,
-            arm: 0,
-            hp: 1,
-            max: 1,
-          },
-          true,
-        );
+        ghost = {
+          type: sel,
+          x: GX + hover.c * CELL + CELL / 2,
+          row: hover.r,
+          t: 0,
+          rec: 0,
+          fl: 0,
+          arm: 0,
+          hp: 1,
+          max: 1,
+        };
     }
-    for (let r = 0; r < ROWS; r++) {
-      for (const u of units) if (u.row === r && u.type === "mine") drawUnit(u);
-      for (const u of units) if (u.row === r && u.type !== "mine") drawUnit(u);
-      for (const z of zs) if (z.row === r) drawZ(z);
-    }
-    for (const p of proj) {
-      const x = p.x | 0,
-        y = p.y | 0;
-      if (p.k === "bullet") {
-      } else if (p.k === "shell") {
-        ctx.fillStyle = "#141a0e";
-        ctx.fillRect(x - 3, y - 1, 5, 3);
-        ctx.fillStyle = "#c8a040";
-        ctx.fillRect(x - 2, y, 4, 1);
-      } else if (p.k === "missile") {
-        ctx.fillStyle = "#141a0e";
-        ctx.fillRect(x - 5, y - 1, 8, 3);
-        ctx.fillStyle = "#cfd3d6";
-        ctx.fillRect(x - 4, y, 6, 1);
-        ctx.fillStyle = "#b8322a";
-        ctx.fillRect(x + 2, y, 1, 1);
-      } else if (p.k === "mort") {
-        ctx.fillStyle = "#141a0e";
-        ctx.fillRect(x - 2, y - 3, 4, 6);
-        ctx.fillStyle = "#5c6268";
-        ctx.fillRect(x - 1, y - 2, 2, 4);
-        if (((p.t * 8) | 0) % 2) {
-          const tx = p.tx | 0,
-            ty = p.ty | 0;
-          ctx.fillStyle = "#ff3b2a";
-          ctx.fillRect(tx - 3, ty, 7, 1);
-          ctx.fillRect(tx, ty - 2, 1, 5);
-        }
-      } else if (p.k === "gren") {
-        ctx.fillStyle = "#141a0e";
-        ctx.fillRect(x - 2, y - 2, 4, 4);
-        ctx.fillStyle = "#4f6b2a";
-        ctx.fillRect(x - 1, y - 1, 2, 2);
-      } else if (p.k === "acid") {
-        ctx.fillStyle = "#2f5a12";
-        ctx.fillRect(x - 2, y - 2, 4, 4);
-        ctx.fillStyle = "#9be22d";
-        ctx.fillRect(x - 1, y - 1, 2, 2);
-      }
-    }
-    for (const c of crates) {
-      const x = c.x | 0,
-        y = c.y | 0;
-      if (c.land && c.life < 2.5 && ((c.life * 8) | 0) % 2) continue;
-      if (!c.land) {
-        ctx.fillStyle = "#141a0e";
-        ctx.fillRect(x - 7, y - 15, 15, 5);
-        ctx.fillStyle = "#e9e4cc";
-        ctx.fillRect(x - 6, y - 14, 13, 3);
-        ctx.fillStyle = "#7f9f40";
-        ctx.fillRect(x - 2, y - 14, 5, 3);
-        ctx.fillStyle = "#141a0e";
-        ctx.fillRect(x - 6, y - 11, 1, 6);
-        ctx.fillRect(x + 6, y - 11, 1, 6);
-      }
-      ctx.fillStyle = "#141a0e";
-      ctx.fillRect(x - 5, y - 5, 11, 9);
-      ctx.fillStyle = "#9a6a32";
-      ctx.fillRect(x - 4, y - 4, 9, 7);
-      ctx.fillStyle = "#f2c230";
-      ctx.fillRect(x, y - 4, 1, 7);
-      ctx.fillRect(x - 4, y - 1, 9, 1);
-    }
+    ctx.restore();
+    // --- tudo o que fica em pé, do fundo para a frente (ordem pela altura na tela)
+    const list = [];
+    const push = (x, row, f, bias = 0) => list.push({ d: iso(x, laneY(row))[1] + bias, f });
+    for (let r = 0; r < ROWS; r++) push(GX - 9, r, () => drawBags(r));
+    for (const c of corpses) push(c.x, c.row, () => drawCorpse(c), -0.5);
+    for (const u of units) push(u.x, u.row, () => drawUnit(u), u.type === "mine" ? -1 : 0);
+    for (const z of zs) push(z.x, z.row, () => drawZ(z), 0.5);
+    for (const c of crates) push(c.x, c.row, () => drawCrate(c), 0.2);
+    if (ghost) push(ghost.x, ghost.row, () => drawUnit(ghost, true), 0.1);
+    list.sort((a, b) => a.d - b.d);
+    for (const it of list) it.f();
+    for (const p of proj) drawProjectile(p);
+    // partículas em pixel (cápsulas, moedas, poeira) — espaço dos efeitos
+    ctx.setTransform(FS * K, 0, 0, FS * K, 0, 0);
     for (const p of parts) {
       ctx.globalAlpha = Math.min(1, (p.life / p.max) * 1.6);
       ctx.fillStyle = p.col;
-      ctx.fillRect(p.x | 0, p.y | 0, p.s, p.s);
+      ctx.fillRect(p.x, p.y, p.s, p.s);
     }
     ctx.globalAlpha = 1;
+    screenT();
+    // barra de preparação da próxima onda (no pé da tela)
     if (waveState === "prep" && state === "play" && timer < 7.5) {
-      const f = 1 - timer / (wave === 0 ? 10 : 7);
-      ctx.fillStyle = "rgba(0,0,0,.5)";
-      ctx.fillRect(GX, H - 3, COLS * CELL, 3);
+      const f = 1 - timer / (wave === 0 ? 10 : 7),
+        w = VW * 0.4;
+      ctx.fillStyle = "rgba(0,0,0,.55)";
+      ctx.fillRect((VW - w) / 2, VH - 16, w, 8);
       ctx.fillStyle = "#f2c230";
-      ctx.fillRect(GX, H - 3, (COLS * CELL * f) | 0, 3);
+      ctx.fillRect((VW - w) / 2, VH - 16, w * f, 8);
     }
     ctx.restore();
   }
@@ -2510,12 +2611,14 @@
 
   /* ---------- entrada ---------- */
   function toLocal(e) {
+    // posição do toque na tela virtual
     const r = cv.getBoundingClientRect();
-    return { x: ((e.clientX - r.left) * W) / r.width, y: ((e.clientY - r.top) * H) / r.height };
+    return { x: ((e.clientX - r.left) * VW) / r.width, y: ((e.clientY - r.top) * VH) / r.height };
   }
   function cellAt(p) {
-    const c = Math.floor((p.x - GX) / CELL),
-      r = Math.floor(p.y / CELL);
+    const g = unproject(p.x, p.y), // tela -> grade
+      c = Math.floor((g.x - GX) / CELL),
+      r = Math.floor(g.y / CELL);
     return c >= 0 && c < COLS && r >= 0 && r < ROWS ? { c, r } : null;
   }
   cv.addEventListener("pointerdown", (e) => {
@@ -2523,12 +2626,13 @@
     if (state !== "play") return;
     const p = toLocal(e);
     for (const c of crates) {
-      if (Math.abs(p.x - c.x) < 10 && Math.abs(p.y - c.y) < 11) {
+      const [cx, cy] = iso(c.x, laneY(c.row));
+      if (Math.abs(p.x - cx) < 12 * K && Math.abs(p.y - (cy - (c.ty - c.y) * K) + 4 * K) < 12 * K) {
         c.life = 0;
         money += 25;
-        coins(c.x, c.y);
-        G(GL.y, c.x, c.y, { r0: 4, r1: 16, life: 0.3 });
-        txt(c.x, c.y - 8, "+$25", "255,214,90");
+        coins(c.x, c.y, c.row);
+        G(GL.y, c.x, c.y, { r0: 4, r1: 16, life: 0.3, row: c.row });
+        txt(c.x, c.y - 8, "+$25", "255,214,90", c.row);
         sfx("coin");
         return;
       }
@@ -3072,16 +3176,15 @@
     const aw = st.clientWidth - 10,
       ah = st.clientHeight - 12;
     const dpr = devicePixelRatio || 1;
-    let s = Math.min(aw / W, ah / H);
-    s = Math.max(s >= 4 ? Math.floor(s) : Math.floor(s * dpr * 8) / (dpr * 8), 0.4);
-    cv.style.width = fxc.style.width = Math.floor(W * s) + "px";
-    cv.style.height = fxc.style.height = Math.floor(H * s) + "px";
+    const s = Math.max(0.15, Math.min(aw / VW, ah / VH)); // tela virtual -> CSS px
+    cv.style.width = fxc.style.width = Math.floor(VW * s) + "px";
+    cv.style.height = fxc.style.height = Math.floor(VH * s) + "px";
     CSS_S = s;
-    const nf = Math.max(2, Math.min(5, Math.ceil(s * (devicePixelRatio || 1))));
-    if (nf !== FS || !vign || cv.width !== W * nf) {
+    const nf = Math.round(Math.min(1.6, s * dpr) * 20) / 20; // pixels do canvas por unidade de tela
+    if (nf !== FS || !vign) {
       FS = nf;
-      fxc.width = cv.width = W * FS;
-      fxc.height = cv.height = H * FS;
+      fxc.width = cv.width = Math.round(VW * FS);
+      fxc.height = cv.height = Math.round(VH * FS);
       buildVign();
     }
   }
@@ -3104,7 +3207,7 @@
     const off = 7 * trauma * trauma,
       sx = rnd(-1, 1) * off,
       sy = rnd(-1, 1) * off * 0.7,
-      tr = `translate(calc(-50% + ${(sx * CSS_S).toFixed(1)}px),calc(-50% + ${(sy * CSS_S).toFixed(1)}px))`;
+      tr = `translate(calc(-50% + ${(sx * K * CSS_S).toFixed(1)}px),calc(-50% + ${(sy * K * CSS_S).toFixed(1)}px))`;
     cv.style.transform = fxc.style.transform = tr;
     render();
     drawFx(0, 0);

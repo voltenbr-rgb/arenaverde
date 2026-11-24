@@ -12,6 +12,11 @@ Cada personagem tem 2 artes, e uma nunca substitui a outra:
 
 O campo é desenhado em alta resolução, então os sprites ficam nítidos e acompanham o tamanho da casa (cerca de 64 px no celular deitado e 80–110 px no PC). Cada sprite tem 2 frames: **parado** (respirando) e **atacando** (recuo). Os zumbis têm frames de andar e de morder.
 
+## Vista isométrica
+O campo é desenhado em ângulo isométrico, sobre o cenário `public/assets/maps/arena.jpg` (muralhas, torre, bunker, barracas). A lógica do jogo continua numa grade simples 5×9; só o desenho e o toque são projetados no tabuleiro inclinado (veja `ISO`, `iso()` e `unproject()` no `game.js`). Para trocar o mapa, substitua a imagem e ajuste `ISO` (canto do tabuleiro e tamanho de uma casa).
+
+O modo principal é o **celular deitado**. Com o celular em pé, aparece uma dica para girar.
+
 ## Estrutura
 ```
 public/
@@ -21,6 +26,7 @@ public/
   sw.js           app offline (PWA)
   assets/cards/   artes das cartas
   assets/sprites/ sprites de ação do campo
+  assets/maps/    cenário isométrico
 src/worker.js     Worker: serve o jogo + API do D1
 schema.sql        tabelas do D1
 ```
