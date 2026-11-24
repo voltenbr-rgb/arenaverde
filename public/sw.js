@@ -1,6 +1,7 @@
 // Arena Verde — service worker: funciona offline e pega versões novas automaticamente.
-const V = 'arenaverde-v5';
-const SHELL = ['/', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/icon-maskable-512.png', '/icons/apple-touch-icon.png'];
+const V = 'arenaverde-v6';
+const SHELL = ['/', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/icon-maskable-512.png', '/icons/apple-touch-icon.png',
+  ...['rifle', 'grenade', 'tank', 'missile', 'mine', 'wire'].flatMap((k) => [`/cards/art-${k}.jpg`, `/cards/card-${k}.jpg`])];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(V).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));

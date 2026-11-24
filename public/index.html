@@ -60,6 +60,13 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .ugrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:12px 0}
 .ucard{position:relative;background:linear-gradient(#3e5524,#2a3a18);border:3px solid var(--dark);box-shadow:inset 0 0 0 2px var(--edge);padding:12px 6px 10px;display:flex;flex-direction:column;align-items:center;gap:7px;font-size:8px;line-height:1.45;min-height:44px}
 .ucard canvas{width:76px;height:76px;image-rendering:pixelated;background:#22301a;border:2px solid var(--dark)}
+.ucard{cursor:pointer;user-select:none}.ucard:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.uart{width:100%;max-width:150px;aspect-ratio:1;object-fit:cover;border:3px solid var(--dark);box-shadow:0 0 0 1px var(--edge);display:block}
+.vc{font-size:7px;background:#1b2511;border:2px solid var(--dark);box-shadow:inset 0 0 0 1px var(--edge);padding:8px 8px;min-height:32px;margin-top:2px}
+#cardv{position:fixed;inset:0;z-index:20;background:rgba(5,8,3,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:16px;cursor:pointer}
+#cardv[hidden]{display:none}#cardv img{max-width:min(92vw,520px);max-height:84dvh;object-fit:contain;filter:drop-shadow(0 8px 0 #000)}#cardv span{font-size:9px;color:var(--dim)}
+.card img.art{width:48px;height:48px;object-fit:cover;border:2px solid var(--dark);box-shadow:0 0 0 1px var(--edge)}
+.card.off img.art{filter:grayscale(.85) brightness(.6)}
 .ucard .nm{font-size:9px;text-align:center;min-height:2.9em;display:flex;align-items:center}
 .ucard .d{color:var(--dim);font-size:7px;text-align:center;min-height:3em}
 .ucard .row{display:flex;justify-content:space-between;width:86%;font-size:8px}
@@ -104,7 +111,7 @@ details.how{margin-top:12px}details.how summary{cursor:pointer;color:var(--gold)
   #stage{flex:none;width:100%;aspect-ratio:262/126;max-height:60dvh}
   #deck{grid-template-columns:repeat(4,minmax(0,1fr))}
   .logo{display:none}.ic svg{width:14px;height:14px}.stat{gap:4px;padding:4px 3px}.badge{width:14px;height:14px;font-size:7px}
-  .card canvas{width:56px;height:56px}
+  .card canvas,.card img.art{width:56px;height:56px}
   .stat b{font-size:12px}
   #banner{top:30%}
 }
@@ -115,7 +122,7 @@ details.how{margin-top:12px}details.how summary{cursor:pointer;color:var(--gold)
   .logo,.stat span{display:none}.stat{padding:2px 6px;gap:6px}.stat b{font-size:12px}.ic svg{width:15px;height:15px}.sq{width:36px;height:30px;font-size:9px}
   #deck{grid-column:1;grid-row:2;display:flex;flex-direction:column;gap:3px;padding:4px;overflow-y:auto;scrollbar-width:none}
   .card{flex:1 1 0;flex-direction:row;justify-content:flex-start;padding:2px 8px 2px 18px;gap:6px;min-height:34px;max-height:64px}
-  .card canvas{width:clamp(22px,7vh,34px);height:clamp(22px,7vh,34px)}
+  .card canvas,.card img.art{width:clamp(22px,7vh,34px);height:clamp(22px,7vh,34px)}
   .card .nm,.card .st,.card .hpb{display:none}.card .cost{font-size:10px;white-space:nowrap}
   .card .badge{width:13px;height:13px;font-size:6px;top:50%;left:3px;transform:translateY(-50%)}
   .card.sel{transform:translateX(4px)}
@@ -145,6 +152,7 @@ details.how{margin-top:12px}details.how summary{cursor:pointer;color:var(--gold)
   <footer id="deck" class="plate"></footer>
 </div>
 <div id="ov"><div class="panel plate" id="panel"></div></div>
+<div id="cardv" hidden role="dialog" aria-label="Carta"><img alt=""><span>TOQUE PARA FECHAR</span></div>
 
 <script>
 {
@@ -226,6 +234,7 @@ const U={
  mortar:{n:'Morteiro',cost:125,hp:80,dmg:70,rate:3.4,cd:8,splash:24,min:40,desc:'Bombardeia de longe, não acerta perto'}
 };
 const ALL=['rifle','grenade','tank','missile','mine','wire','mg','mortar'];
+for(const k of['rifle','grenade','tank','missile','mine','wire']){U[k].art=`cards/art-${k}.jpg`;U[k].card=`cards/card-${k}.jpg`}
 let ORDER=['rifle','grenade','tank','missile','mine','wire'];try{const q=JSON.parse(localStorage.getItem('arenaverde.squad'));if(Array.isArray(q)&&q.length&&q.length<=6&&q.every(k=>U[k]))ORDER=q}catch(e){}
 const ZD={
  normal:{n:'Zumbi Comum',desc:'Lento e teimoso',hp:100,sp:5,dps:20,cash:15,base:10,pts:100},
@@ -478,7 +487,7 @@ const icon=(img)=>{const c=mk(32,32),x=c.getContext('2d');x.imageSmoothingEnable
 function buildDeck(){deck.innerHTML='';for(const k in cards)delete cards[k];
  [...ORDER,'shovel'].forEach((k,i)=>{const b=document.createElement('button');b.className='card'+(k==='shovel'?' tool':'');const d=U[k];
  const bd=document.createElement('span');bd.className='badge';bd.textContent=k==='shovel'?'Q':i+1;b.append(bd);
- b.append(icon(SP[k]));
+ if(d&&d.art){const im=new Image();im.className='art';im.src=d.art;im.alt='';im.decoding='async';b.append(im)}else b.append(icon(SP[k]));
  const nm=document.createElement('div');nm.className='nm';nm.textContent=d?d.n:'Remover';b.append(nm);
  const co=document.createElement('div');co.className='cost';if(d){const ci=document.createElement('i');ci.className='coin';co.append(ci,String(d.cost))}else co.textContent='+50%';b.append(co);
  if(d){const hb=document.createElement('div');hb.className='hpb';const hi=document.createElement('i');hi.style.width=Math.min(100,d.hp/3)+'%';hb.append(hi);b.append(hb)}
@@ -534,7 +543,7 @@ let pickSquad=[];
 function statRow(l,v,pct){return `<div class="row"><span>${l}</span><span>${v}</span></div>`+(pct!=null?`<div class="hpb"><i style="width:${pct}%"></i></div>`:'')}
 function showSquad(keep){if(!keep)pickSquad=[...ORDER];const y=ov.scrollTop;
  showOv(`<h2 class="title" style="font-size:clamp(22px,5vw,40px)">ESCOLHA SEU<br>ESQUADRÃO</h2><p class="sub">Selecione até 6 unidades para a missão</p>
- <div class="ugrid">${ALL.map((k,i)=>{const d=U[k],o=pickSquad.indexOf(k);return `<button class="ucard${o>=0?' on':''}" data-u="${k}" aria-pressed="${o>=0}"><span class="badge">${o>=0?o+1:i+1}</span><canvas data-ic="${k}" width="40" height="40"></canvas><div class="nm">${d.n}</div><div class="cost"><i class="coin"></i>${d.cost}</div>${statRow('HP',d.hp,Math.min(100,d.hp/3))}${statRow('DMG',d.dmg)}<div class="d">${d.desc}</div></button>`}).join('')}</div>
+ <div class="ugrid">${ALL.map((k,i)=>{const d=U[k],o=pickSquad.indexOf(k);return `<div class="ucard${o>=0?' on':''}" data-u="${k}" role="button" tabindex="0" aria-pressed="${o>=0}"><span class="badge">${o>=0?o+1:i+1}</span>${d.art?`<img class="uart" src="${d.art}" alt="${d.n}">`:`<canvas data-ic="${k}" width="40" height="40"></canvas>`}<div class="nm">${d.n}</div><div class="cost"><i class="coin"></i>${d.cost}</div>${statRow('HP',d.hp,Math.min(100,d.hp/3))}${statRow('DMG',d.dmg)}<div class="d">${d.desc}</div>${d.card?`<button class="vc" data-card="${k}">VER CARTA</button>`:''}</div>`}).join('')}</div>
  <div class="bbar"><span><i class="coin"></i>MOEDAS: 350</span><span>${pickSquad.length}/6 SELECIONADAS</span><span><button class="alt" data-a="menu" style="margin:0 6px 0 0">VOLTAR</button><button class="big" data-a="start" ${pickSquad.length?'':'disabled'}>INICIAR MISSÃO ▶</button></span></div>`);
  for(const c of panel.querySelectorAll('canvas[data-ic]'))paintIcon(c,SP[c.dataset.ic]);ov.scrollTop=keep?y:0}
 function showEnemies(){showOv(`<h2 class="title" style="font-size:clamp(22px,5vw,40px)">INIMIGOS</h2><p class="sub">Conheça a horda antes da batalha</p>
@@ -549,7 +558,10 @@ function gameOver(){if(state!=='play')return;state='over';sfx('lose');const nb=s
  <div class="sendrow" id="send" hidden><input id="nm" maxlength="12" placeholder="SEU NOME" autocomplete="off"><button class="alt" data-a="send" style="margin:0">ENVIAR</button></div>
  <ol class="board" id="board"></ol><button class="big" data-a="restart">JOGAR DE NOVO</button><button class="alt" data-a="menu">MENU</button>`),900);
  setTimeout(loadBoard,950)}
-ov.addEventListener('click',e=>{const uc=e.target.closest('[data-u]');if(uc){audio();const k=uc.dataset.u,o=pickSquad.indexOf(k);if(o>=0)pickSquad.splice(o,1);else if(pickSquad.length<6)pickSquad.push(k);else{uc.classList.remove('nope');void uc.offsetWidth;uc.classList.add('nope');return}sfx('place');showSquad(true);return}
+ov.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.matches('.ucard[data-u]')){e.preventDefault();e.target.click()}});
+$('cardv').addEventListener('click',()=>{$('cardv').hidden=true});
+ov.addEventListener('click',e=>{const vc=e.target.closest('[data-card]');if(vc){const cv=$('cardv');cv.querySelector('img').src=U[vc.dataset.card].card;cv.querySelector('img').alt=U[vc.dataset.card].n;cv.hidden=false;return}
+ const uc=e.target.closest('[data-u]');if(uc){audio();const k=uc.dataset.u,o=pickSquad.indexOf(k);if(o>=0)pickSquad.splice(o,1);else if(pickSquad.length<6)pickSquad.push(k);else{uc.classList.remove('nope');void uc.offsetWidth;uc.classList.add('nope');return}sfx('place');showSquad(true);return}
  const a=e.target.closest('[data-a]');if(!a)return;audio();const k=a.dataset.a;
  if(k==='start'&&$('panel').querySelector('.ugrid [data-u]')){if(!pickSquad.length)return;ORDER=[...pickSquad];try{localStorage.setItem('arenaverde.squad',JSON.stringify(ORDER))}catch(e){}buildDeck()}
  if(k==='start'||k==='restart'){reset();state='play';hideOv()}else if(k==='squad')showSquad();else if(k==='enemies')showEnemies();else if(k==='install'){if(deferredInstall){deferredInstall.prompt();deferredInstall.userChoice.finally(()=>{deferredInstall=null;const b=$('bInstall');if(b)b.hidden=true})}}else if(k==='resume'){state='play';hideOv()}else if(k==='menu'){reset();state='menu';$('banner').classList.remove('show');showMenu()}else if(k==='send')sendScore()});
