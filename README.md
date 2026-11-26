@@ -12,6 +12,19 @@ Cada personagem tem 2 artes, e uma nunca substitui a outra:
 
 O campo é desenhado em alta resolução, então os sprites ficam nítidos e acompanham o tamanho da casa (cerca de 64 px no celular deitado e 80–110 px no PC). Cada sprite tem 2 frames: **parado** (respirando) e **atacando** (recuo). Os zumbis têm frames de andar e de morder.
 
+## Modo Tanque
+No menu, **MODO TANQUE** abre a **Garagem**, onde você escolhe a camuflagem (verde, deserto, neve ou urbano), o canhão (leve, padrão ou pesado) e o chassi (leve, médio ou pesado). Depois você pilota o tanque pelo mapa contra as 10 ondas. Entre as ondas, a **Oficina** vende melhorias com as moedas ganhas: blindagem, munição, recarga, metralhadora, motor e reparo.
+
+| Ação | PC | Celular |
+| --- | --- | --- |
+| Andar / ré | ↑ / ↓ | joystick |
+| Girar o tanque | ← / → | joystick |
+| Girar a torreta | A / D (ou mouse) | mira automática |
+| Canhão | Espaço ou B (ou clique) | botão CANHÃO |
+| Metralhadora | Enter (segure) | botão METRALHADORA |
+
+A metralhadora esquenta e para por um tempo se você atirar sem parar. Passar por cima dos zumbis com o tanque também causa dano. Caixas de paraquedas dão reparo ou moedas. O código fica na seção `MODO TANQUE` do `game.js`.
+
 ## Vista isométrica
 O campo é desenhado em ângulo isométrico, sobre o cenário `public/assets/maps/arena.jpg` (muralhas, torre, bunker, barracas). A lógica do jogo continua numa grade simples 5×9; só o desenho e o toque são projetados no tabuleiro inclinado (veja `ISO`, `iso()` e `unproject()` no `game.js`). Para trocar o mapa, substitua a imagem e ajuste `ISO` (canto do tabuleiro e tamanho de uma casa).
 

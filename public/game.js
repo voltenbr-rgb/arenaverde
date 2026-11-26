@@ -19,6 +19,7 @@
   /* ---------- câmera isométrica ----------
      Tela virtual = tamanho do cenário (assets/maps/arena.jpg). ISO = canto do tabuleiro
      (coluna 0, linha 0) e vetores de uma casa ao longo da linha (c) e entre linhas (r). */
+  let MODE = "def"; // "def" = defesa de torres, "tank" = modo tanque (ver MODO TANQUE)
   const CAM = { x: 40, y: 58 }; // recorte do cenário (aproxima a câmera do tabuleiro)
   const VW = 1310 - 2 * CAM.x,
     VH = 830 - CAM.y - 40;
@@ -47,6 +48,7 @@
   };
   // efeitos (partículas) vivem no espaço da tela dividido por K
   const toFx = (x, y, row) => {
+    if (MODE === "tank") return [x, y]; // no modo tanque os efeitos já chegam em espaço de efeitos
     const [sx, sy] = scr(x, y, row);
     return [sx / K, sy / K];
   };
@@ -1178,6 +1180,14 @@
   const rnd = (a, b) => a + Math.random() * (b - a);
   // efeito: converte a posição da grade para o espaço da tela (÷K); o.row força a linha
   function add(o) {
+    if (MODE === "tank") {
+      if (o.gy != null) {
+        o.lx = o.x;
+        o.ly = o.gy;
+      }
+      fxs.push(o);
+      return;
+    }
     const row = o.row != null ? o.row : rowOf(o.y);
     if (o.gy != null) {
       o.lx = o.x; // ponto do chão (para a mancha no decal)
@@ -1197,6 +1207,16 @@
     add(p);
   }
   function scorch(x, y, r) {
+    if (MODE === "tank") {
+      // modo tanque: mancha na camada de tela
+      for (let i = 0; i < 3; i++) {
+        tdc.fillStyle = `rgba(22,16,8,${0.18 + i * 0.1})`;
+        tdc.beginPath();
+        tdc.ellipse(x * K, y * K, r * K * (1 - i * 0.3), r * K * 0.5 * (1 - i * 0.3), 0, 0, 7);
+        tdc.fill();
+      }
+      return;
+    }
     for (let i = 0; i < 3; i++) {
       dc.fillStyle = `rgba(22,16,8,${0.22 + i * 0.12})`;
       dc.beginPath();
@@ -1205,6 +1225,11 @@
     }
   }
   function splat(x, y, c) {
+    if (MODE === "tank") {
+      tdc.fillStyle = c || "rgba(70,150,30,.6)";
+      tdc.fillRect(x * K, y * K, K * 1.4, K * 0.9);
+      return;
+    }
     dc.fillStyle = c || "rgba(70,150,30,.6)";
     dc.fillRect(x | 0, y | 0, 1 + ((Math.random() * 2) | 0), 1);
   }
@@ -1299,7 +1324,7 @@
         drag: 0.5,
         ember: rnd(0, 6),
       });
-    scorch(x, laneY(rowOf(y)) + 1, 4 * k);
+    MODE === "tank" ? scorch(x, y + 3, 4 * k) : scorch(x, laneY(rowOf(y)) + 1, 4 * k);
   }
   function muzzle(x, y, s = 1) {
     G(GL.y, x + 2 * s, y, { r0: 3 * s, r1: 5 * s, life: 0.07 });
@@ -1390,7 +1415,7 @@
     fxs = fxs.filter((p) => p.life > 0);
     for (const c of corpses) c.t += dt;
     corpses = corpses.filter((c) => c.t < 2.6);
-    ambT -= dt;
+    if (MODE === "def") ambT -= dt;
     if (ambT <= 0) {
       ambT = 0.35;
       const c = CRATERS[(Math.random() * CRATERS.length) | 0];
@@ -2686,6 +2711,12 @@
   });
   addEventListener("keydown", (e) => {
     if (e.target.tagName === "INPUT") return;
+    if (MODE === "tank") {
+      if (state === "play" && tKey(e, true)) return;
+      const k = e.key.toLowerCase();
+      if (k === "p" || k === "escape") togglePause();
+      return;
+    }
     const k = e.key.toLowerCase(),
       i = "123456".indexOf(k);
     if (i >= 0 && k) pick(ORDER[i]);
@@ -2724,7 +2755,9 @@
 
   $("bRestart").onclick = () => {
     audio();
-    if (state === "play" || state === "pause" || state === "over") startGame(false);
+    if (MODE === "tank") {
+      if (state !== "menu" && state !== "tsetup") tStart();
+    } else if (state === "play" || state === "pause" || state === "over") startGame(false);
   };
 
   /* ---------- telas ---------- */
@@ -2761,7 +2794,7 @@
   function showMenu() {
     const canContinue = progress && progress.wave_atual > 1 && progress.wave_atual <= MAX_WAVE;
     showOv(`<h1 class="title">ARENA<br>VERDE</h1><p class="sub">${profile ? `Soldado ${esc(profile.apelido)} · ` : ""}Defenda a base por ${MAX_WAVE} ondas</p><canvas id="scene" width="960" height="400"></canvas>
- <div class="menu-btns">${canContinue ? `<button class="big" data-a="continue">CONTINUAR · ONDA ${progress.wave_atual}</button>` : ""}<button class="${canContinue ? "alt" : "big"}" data-a="squad">${canContinue ? "NOVO JOGO" : "JOGAR ▶"}</button><button class="alt" data-a="enemies">INIMIGOS</button><button class="alt" data-a="profile">${profile ? "PERFIL" : "CRIAR PERFIL"}</button><button class="alt" id="bInstall" data-a="install" ${deferredInstall ? "" : "hidden"}>INSTALAR APP</button></div>
+ <div class="menu-btns">${canContinue ? `<button class="big" data-a="continue">CONTINUAR · ONDA ${progress.wave_atual}</button>` : ""}<button class="${canContinue ? "alt" : "big"}" data-a="squad">${canContinue ? "NOVO JOGO" : "JOGAR ▶"}</button><button class="big tbtn" data-a="tsetup">MODO TANQUE ▶</button><button class="alt" data-a="enemies">INIMIGOS</button><button class="alt" data-a="profile">${profile ? "PERFIL" : "CRIAR PERFIL"}</button><button class="alt" id="bInstall" data-a="install" ${deferredInstall ? "" : "hidden"}>INSTALAR APP</button></div>
  ${isIOS && !isStandalone() ? '<p class="hint">No iPhone: toque em Compartilhar e depois em "Adicionar à Tela de Início" para instalar.</p>' : ""}
  <details class="how"><summary>★ COMO JOGAR</summary><ul class="how"><li>Monte um esquadrão de até 6 cartas</li><li>Toque numa carta e depois numa casa da grade</li><li>Você ganha moedas com o tempo, abatendo zumbis e pegando caixas de suprimento</li><li>Zumbis que passam pelos sacos de areia tiram vida da base</li><li>Sobreviva às ${MAX_WAVE} ondas: na última vem o Chefão Metralhadora</li><li>Metralhadora libera na onda ${UNLOCK_AT.mg} e Morteiro na onda ${UNLOCK_AT.mortar}</li><li>PC: teclas 1–6, Q pá, P pausa, F velocidade</li></ul></details>
  <div class="rec">RECORDE: ${best}</div><ol class="board" id="board"></ol>`);
@@ -2929,7 +2962,21 @@
       store.set("squad", ORDER);
       buildDeck();
       startGame(false);
-    } else if (k === "restart") startGame(false);
+    } else if (k === "restart") MODE === "tank" ? tStart() : startGame(false);
+    else if (k === "tsetup") showTankSetup();
+    else if (k === "tgo") {
+      store.set("tank", tcfg);
+      tStart();
+    } else if (k === "tcfg") {
+      tcfg[a.dataset.g] = a.dataset.v;
+      store.set("tank", tcfg);
+      sfx("place");
+      const y = ov.scrollTop;
+      showTankSetup();
+      ov.scrollTop = y;
+    } else if (k === "tup") buyUpgrade(a.dataset.k);
+    else if (k === "trep") buyRepair();
+    else if (k === "tnext") nextWave();
     else if (k === "continue") startGame(true);
     else if (k === "squad") {
       if (!profile && !store.get("skipProfile")) {
@@ -2952,6 +2999,7 @@
       state = "play";
       hideOv();
     } else if (k === "menu") {
+      if (MODE === "tank") tExit();
       reset();
       state = "menu";
       $("banner").classList.remove("show");
@@ -3170,6 +3218,1174 @@
     sb("missile", 162, 99, 24);
   }
 
+  /* ==========================================================================
+     MODO TANQUE
+     O jogador pilota um tanque pelo mapa isométrico e enfrenta as ondas.
+     Coordenadas do mundo = as mesmas da grade (x, y no chão, em unidades);
+     h = altura acima do chão. iso(x,y) projeta para a tela.
+     Teclado: ↑↓ anda · ←→ gira o casco · A/D gira a torreta ·
+              Espaço ou B = canhão · Enter = metralhadora (segure)
+     Celular: joystick (esquerda) + botões CANHÃO e METRALHADORA; mira automática.
+     ========================================================================== */
+  const CAMO = {
+    verde: { n: "Verde", base: "#5b7530", side: "#2f3f18", dark: "#3d521f", blobs: ["#41571f", "#7a9442", "#2a3814"] },
+    deserto: {
+      n: "Deserto",
+      base: "#bfa063",
+      side: "#6e5a33",
+      dark: "#8c7445",
+      blobs: ["#9c7f48", "#dcc48d", "#6e5a33"],
+    },
+    neve: { n: "Neve", base: "#dcdfd8", side: "#7b807a", dark: "#a8ada6", blobs: ["#b3b8b0", "#f5f6f2", "#8e938c"] },
+    urbano: {
+      n: "Urbano",
+      base: "#6d7278",
+      side: "#34383c",
+      dark: "#4f5459",
+      blobs: ["#4f5459", "#9196a0", "#2c2f33"],
+    },
+  };
+  const CANNON = {
+    leve: {
+      n: "Leve",
+      dmg: 45,
+      reload: 0.75,
+      splash: 12,
+      speed: 340,
+      range: 300,
+      len: 15,
+      w: 2.2,
+      k: 0.9,
+      desc: "Recarrega rápido",
+    },
+    padrao: {
+      n: "Padrão",
+      dmg: 75,
+      reload: 1.3,
+      splash: 18,
+      speed: 300,
+      range: 320,
+      len: 18,
+      w: 2.8,
+      k: 1.3,
+      desc: "Equilibrado",
+    },
+    pesado: {
+      n: "Pesado",
+      dmg: 130,
+      reload: 2.1,
+      splash: 28,
+      speed: 260,
+      range: 330,
+      len: 20,
+      w: 3.8,
+      k: 1.9,
+      desc: "Explosão enorme, recarga lenta",
+    },
+  };
+  const CHASSIS = {
+    leve: { n: "Leve", hp: 260, speed: 62, turn: 2.7, L: 26, W: 17, desc: "Rápido, pouca blindagem" },
+    medio: { n: "Médio", hp: 360, speed: 48, turn: 2.2, L: 29, W: 19, desc: "Equilibrado" },
+    pesado: { n: "Pesado", hp: 520, speed: 36, turn: 1.8, L: 32, W: 21, desc: "Muita blindagem, lento" },
+  };
+  // melhorias compradas na oficina entre as ondas (valem só na partida)
+  const UPG = [
+    { k: "armor", n: "Blindagem", desc: "+20% de vida máxima" },
+    { k: "dmg", n: "Munição perfurante", desc: "+20% de dano do canhão" },
+    { k: "reload", n: "Carregador automático", desc: "-15% no tempo de recarga" },
+    { k: "mg", n: "Metralhadora .50", desc: "+30% de dano e esquenta menos" },
+    { k: "engine", n: "Motor turbo", desc: "+12% de velocidade" },
+  ];
+  const UPG_COST = [80, 140, 220];
+  const REPAIR_COST = 60;
+  let tcfg = Object.assign({ camo: "verde", cannon: "padrao", chassis: "medio" }, store.get("tank") || {});
+  let tankBest = +(store.get("tankBest") || 0);
+  let T = null, // o tanque
+    tz = [], // zumbis
+    tp = [], // projéteis do tanque
+    zp = [], // projéteis dos zumbis
+    tcorpse = [],
+    tdrops = [],
+    lv = {},
+    airT = 12;
+  const tkeys = new Set();
+  const tin = { joy: null, cannon: false, mg: false, touch: false, mouse: null };
+  // manchas (crateras, sangue) do modo tanque: em espaço de tela
+  const tdecal = mk(VW, VH),
+    tdc = tdecal.getContext("2d");
+  // manchas de camuflagem (posições fixas, em fração do casco)
+  const BLOBS = [];
+  {
+    let sd = 5;
+    const r = () => (sd = (sd * 9301 + 49297) % 233280) / 233280;
+    for (let i = 0; i < 11; i++)
+      BLOBS.push({ x: r() * 2 - 1, y: r() * 2 - 1, rx: 2 + r() * 3.5, ry: 1.4 + r() * 2.4, a: r() * 3, c: i % 3 });
+  }
+  // ponto do mundo -> espaço dos efeitos (tela ÷ K)
+  const P = (x, y, h = 0) => {
+    const [sx, sy] = iso(x, y);
+    return [sx / K, sy / K - h];
+  };
+  // vetor na tela -> direção no chão
+  const screenToGroundDir = (dx, dy) => {
+    const det = ISO.cx * ISO.ry - ISO.rx * ISO.cy;
+    return Math.atan2((-ISO.cy * dx + ISO.cx * dy) / det, (ISO.ry * dx - ISO.rx * dy) / det);
+  };
+  const angDiff = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
+  const turnTo = (a, target, max) => {
+    const d = angDiff(target, a);
+    return a + Math.max(-max, Math.min(max, d));
+  };
+  const tStats = () => {
+    const ch = CHASSIS[tcfg.chassis],
+      cn = CANNON[tcfg.cannon];
+    return {
+      max: Math.round(ch.hp * (1 + 0.2 * (lv.armor || 0))),
+      speed: ch.speed * (1 + 0.12 * (lv.engine || 0)),
+      turn: ch.turn,
+      dmg: cn.dmg * (1 + 0.2 * (lv.dmg || 0)),
+      reload: cn.reload * Math.pow(0.85, lv.reload || 0),
+      mgDmg: 9 * (1 + 0.3 * (lv.mg || 0)),
+      mgHeat: 0.045 * (1 - 0.15 * (lv.mg || 0)),
+    };
+  };
+
+  /* ---------- desenho do tanque (pseudo-3D: camadas empilhadas no plano do chão) ---------- */
+  function oct(c, rx, ry) {
+    c.beginPath();
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2 + Math.PI / 8;
+      c.lineTo(Math.cos(a) * rx, Math.sin(a) * ry);
+    }
+    c.closePath();
+    c.fill();
+  }
+  // M = matriz do chão (grade -> pixels), hk = pixels por unidade de altura
+  function drawTank(c, M, hk, t, cfg, fl = 0) {
+    const ch = CHASSIS[cfg.chassis],
+      cn = CANNON[cfg.cannon],
+      cm = CAMO[cfg.camo],
+      L = ch.L,
+      W = ch.W,
+      tw = 5;
+    const lay = (h) => {
+      c.setTransform(M[0], M[1], M[2], M[3], M[4], M[5] - h * hk);
+      c.translate(t.x, t.y);
+      c.rotate(t.ang);
+    };
+    const R = W * 0.37,
+      px = -2;
+    const tur = (h) => {
+      lay(h);
+      c.translate(px, 0);
+      c.rotate(t.tur - t.ang);
+    };
+    c.save();
+    // sombra
+    lay(0);
+    c.fillStyle = "rgba(0,0,0,.32)";
+    c.beginPath();
+    c.ellipse(1.5, 1.5, L / 2 + 4, W / 2 + 4, 0, 0, 7);
+    c.fill();
+    // esteiras
+    for (let h = 0; h <= 3; h += 0.5) {
+      lay(h);
+      c.fillStyle = h < 3 ? "#13170b" : "#2b3021";
+      for (const s of [-1, 1]) c.fillRect(-L / 2, s * (W / 2 - tw / 2) - tw / 2, L, tw);
+    }
+    lay(3);
+    c.fillStyle = "#4b513d";
+    for (const s of [-1, 1])
+      for (let i = 0; i < L; i += 3) {
+        const x = -L / 2 + ((((i + t.phase) % L) + L) % L);
+        c.fillRect(x, s * (W / 2 - tw / 2) - tw / 2, 1, tw);
+      }
+    // casco
+    for (let h = 3; h <= 7; h += 0.5) {
+      lay(h);
+      c.fillStyle = h < 7 ? cm.side : cm.base;
+      c.fillRect(-L / 2 + 1, -W / 2 + 1.5, L - 2, W - 3);
+    }
+    lay(7);
+    c.save();
+    c.beginPath();
+    c.rect(-L / 2 + 1, -W / 2 + 1.5, L - 2, W - 3);
+    c.clip();
+    for (const b of BLOBS) {
+      c.fillStyle = cm.blobs[b.c];
+      c.beginPath();
+      c.ellipse((b.x * L) / 2, (b.y * W) / 2, b.rx, b.ry, b.a, 0, 7);
+      c.fill();
+    }
+    c.restore();
+    c.fillStyle = "rgba(255,255,255,.18)";
+    c.fillRect(L / 2 - 4, -W / 2 + 1.5, 2.5, W - 3); // placa frontal
+    c.fillStyle = "rgba(0,0,0,.3)";
+    for (let i = 0; i < 4; i++) c.fillRect(-L / 2 + 2 + i * 1.6, -W / 2 + 4, 0.8, W - 8); // grade do motor
+    c.fillStyle = "#f4e7a2";
+    c.fillRect(L / 2 - 2, -W / 2 + 2, 1.4, 2);
+    c.fillRect(L / 2 - 2, W / 2 - 4, 1.4, 2);
+    if (fl > 0) {
+      c.fillStyle = `rgba(255,70,50,${Math.min(0.35, fl * 5)})`;
+      c.fillRect(-L / 2 + 1, -W / 2 + 1.5, L - 2, W - 3);
+    }
+    // torreta
+    for (let h = 7; h <= 11; h += 0.5) {
+      tur(h);
+      c.fillStyle = h < 11 ? cm.side : cm.base;
+      oct(c, R * 1.15, R);
+    }
+    tur(11);
+    c.save();
+    oct(c, R * 1.15, R);
+    c.clip();
+    for (const b of BLOBS) {
+      c.fillStyle = cm.blobs[(b.c + 1) % 3];
+      c.beginPath();
+      c.ellipse(b.x * R, b.y * R, b.rx * 0.6, b.ry * 0.6, b.a, 0, 7);
+      c.fill();
+    }
+    c.restore();
+    c.fillStyle = cm.dark;
+    c.beginPath();
+    c.arc(-R * 0.35, R * 0.3, R * 0.32, 0, 7); // escotilha
+    c.fill();
+    // canhão (recua ao atirar)
+    const rec = Math.max(0, t.rec || 0) * 12;
+    for (let h = 9; h <= 10.5; h += 0.5) {
+      tur(h);
+      c.fillStyle = h < 10.5 ? "#141a0c" : cm.dark;
+      c.fillRect(R * 0.85 - rec, -cn.w / 2, cn.len, cn.w);
+      c.fillStyle = "#141a0c";
+      c.fillRect(R * 0.85 - rec + cn.len - 2.6, -cn.w / 2 - 0.8, 3, cn.w + 1.6); // freio de boca
+    }
+    // metralhadora no teto da torreta
+    tur(11.6);
+    c.fillStyle = "#1a1d14";
+    c.fillRect(0, -R * 0.6, 3, 2);
+    c.fillRect(2, -R * 0.6 + 0.6, 9, 0.9);
+    c.restore();
+  }
+  const groundM = () => [
+    (FS * ISO.cx) / CELL,
+    (FS * ISO.cy) / CELL,
+    (FS * ISO.rx) / CELL,
+    (FS * ISO.ry) / CELL,
+    FS * (ISO.ox - (GX * ISO.cx) / CELL),
+    FS * (ISO.oy - (GX * ISO.cy) / CELL),
+  ];
+
+  /* ---------- início / fim ---------- */
+  let engine = null;
+  function engineOn() {
+    try {
+      if (!AC || engine) return;
+      const o = AC.createOscillator(),
+        f = AC.createBiquadFilter(),
+        g = AC.createGain();
+      o.type = "sawtooth";
+      o.frequency.value = 38;
+      f.type = "lowpass";
+      f.frequency.value = 190;
+      g.gain.value = 0;
+      o.connect(f);
+      f.connect(g);
+      g.connect(sfxG);
+      o.start();
+      engine = { o, g };
+    } catch (e) {}
+  }
+  function engineOff() {
+    if (!engine) return;
+    try {
+      engine.g.gain.setTargetAtTime(0, AC.currentTime, 0.05);
+      const o = engine.o;
+      setTimeout(() => o.stop(), 300);
+    } catch (e) {}
+    engine = null;
+  }
+  function tStart() {
+    MODE = "tank";
+    document.body.classList.add("tank");
+    reset();
+    $("banner").classList.remove("show");
+    lv = {};
+    const st = tStats();
+    T = {
+      x: GX + 2.2 * CELL,
+      y: 2.5 * CELL,
+      ang: 0,
+      tur: 0,
+      vel: 0,
+      hp: st.max,
+      cd: 0.5,
+      mgCd: 0,
+      heat: 0,
+      over: false,
+      rec: 0,
+      phase: 0,
+      fl: 0,
+    };
+    tz = [];
+    tp = [];
+    zp = [];
+    tcorpse = [];
+    tdrops = [];
+    airT = 12;
+    money = 100;
+    tdc.clearRect(0, 0, VW, VH);
+    waveState = "prep";
+    timer = 4;
+    state = "play";
+    hideOv();
+    audio();
+    engineOn();
+    banner("PILOTE O TANQUE!", 2.2);
+  }
+  function tExit() {
+    engineOff();
+    MODE = "def";
+    document.body.classList.remove("tank");
+    tkeys.clear();
+    tin.cannon = tin.mg = false;
+    tin.joy = null;
+  }
+  function tEnd(won) {
+    if (state !== "play") return;
+    state = "over";
+    engineOff();
+    sfx(won ? "wave" : "lose");
+    const nb = score > tankBest;
+    if (nb) {
+      tankBest = score;
+      store.set("tankBest", tankBest);
+    }
+    setTimeout(
+      () =>
+        showOv(`<h2 class="title" style="font-size:clamp(24px,6vw,42px)">${won ? "VITÓRIA!" : "TANQUE<br>DESTRUÍDO"}</h2><p class="sub">${won ? "Você limpou as " + MAX_WAVE + " ondas!" : nb ? "NOVO RECORDE!" : "A horda venceu desta vez"}</p>
+ <div class="res"><div>PONTOS<b>${score}</b></div><div>ONDA<b>${wave}/${MAX_WAVE}</b></div><div>ABATES<b>${kills}</b></div><div>RECORDE<b>${tankBest}</b></div></div>
+ <button class="big" data-a="tgo">JOGAR NOVAMENTE</button><button class="alt" data-a="tsetup">GARAGEM</button><button class="alt" data-a="menu">MENU</button>`),
+      won ? 1500 : 1200,
+    );
+  }
+
+  /* ---------- telas: garagem (personalização) e oficina (melhorias) ---------- */
+  function optRow(title, group, table, extra) {
+    return `<div class="trow"><span class="tlab">${title}</span><div class="topts">${Object.keys(table)
+      .map(
+        (k) =>
+          `<button class="opt${tcfg[group] === k ? " on" : ""}" data-a="tcfg" data-g="${group}" data-v="${k}">${group === "camo" ? `<i class="sw" style="background:${table[k].base}"></i>` : ""}${table[k].n}${extra ? `<small>${extra(table[k])}</small>` : ""}</button>`,
+      )
+      .join("")}</div></div>`;
+  }
+  function showTankSetup() {
+    state = "tsetup";
+    const ch = CHASSIS[tcfg.chassis],
+      cn = CANNON[tcfg.cannon];
+    showOv(`<h2 class="title" style="font-size:clamp(22px,5vw,40px)">GARAGEM</h2><p class="sub">Monte seu tanque de guerra</p>
+ <canvas id="tprev" width="560" height="300"></canvas>
+ <div class="tstats"><span>VIDA <b>${ch.hp}</b></span><span>VELOC. <b>${ch.speed}</b></span><span>DANO <b>${cn.dmg}</b></span><span>RECARGA <b>${cn.reload}s</b></span></div>
+ ${optRow("CAMUFLAGEM", "camo", CAMO)}
+ ${optRow("CANHÃO", "cannon", CANNON, (o) => o.desc)}
+ ${optRow("CHASSI", "chassis", CHASSIS, (o) => o.desc)}
+ <p class="hint">PC: ↑↓ anda · ←→ gira · A/D torreta (ou mouse) · ESPAÇO/B canhão · ENTER metralhadora<br>Celular: joystick à esquerda, botões à direita, mira automática</p>
+ <button class="big" data-a="tgo">INICIAR BATALHA ▶</button><button class="alt" data-a="menu">VOLTAR</button>`);
+    drawPreview(0);
+  }
+  function drawPreview(time) {
+    const c = $("tprev");
+    if (!c) return;
+    const x = c.getContext("2d"),
+      s = 5.4;
+    x.setTransform(1, 0, 0, 1, 0, 0);
+    x.clearRect(0, 0, c.width, c.height);
+    const g = x.createRadialGradient(280, 175, 20, 280, 175, 260);
+    g.addColorStop(0, "#5a8a32");
+    g.addColorStop(1, "#22331a");
+    x.fillStyle = g;
+    x.fillRect(0, 0, c.width, c.height);
+    const M = [s * 0.95, -s * 0.52, s * 0.95, s * 0.52, 280, 190];
+    drawTank(
+      x,
+      M,
+      s * 1.08,
+      { x: 0, y: 0, ang: 0.5, tur: 0.5 + Math.sin(time * 0.8) * 0.7, phase: time * 8, rec: 0 },
+      tcfg,
+    );
+  }
+  function showShop() {
+    state = "shop";
+    const st = tStats();
+    showOv(`<h2 class="title" style="font-size:clamp(22px,5vw,40px)">OFICINA</h2><p class="sub">Onda ${wave} limpa! Melhore o tanque antes da próxima</p>
+ <div class="bbar" style="position:static;margin-bottom:10px"><span><i class="coin"></i>MOEDAS: ${money}</span><span>VIDA ${Math.ceil(T.hp)}/${st.max}</span></div>
+ <div class="ugrid">${UPG.map((u) => {
+   const l = lv[u.k] || 0,
+     cost = UPG_COST[l];
+   return `<div class="ucard"><div class="nm">${u.n}</div><div class="d">${u.desc}</div><div class="lvl">${"★".repeat(l)}${"☆".repeat(3 - l)}</div>${l >= 3 ? '<div class="lock">NÍVEL MÁXIMO</div>' : `<button class="alt" data-a="tup" data-k="${u.k}" ${money < cost ? "disabled" : ""} style="margin:0"><i class="coin"></i>${cost}</button>`}</div>`;
+ }).join(
+   "",
+ )}<div class="ucard"><div class="nm">Reparo</div><div class="d">Recupera 40% da vida</div><div class="lvl">🔧</div><button class="alt" data-a="trep" ${money < REPAIR_COST || T.hp >= st.max ? "disabled" : ""} style="margin:0"><i class="coin"></i>${REPAIR_COST}</button></div></div>
+ <button class="big" data-a="tnext">PRÓXIMA ONDA ▶</button>`);
+  }
+  function buyUpgrade(k) {
+    const l = lv[k] || 0;
+    if (l >= 3 || money < UPG_COST[l]) return;
+    const before = tStats().max;
+    money -= UPG_COST[l];
+    lv[k] = l + 1;
+    if (k === "armor") T.hp += tStats().max - before;
+    sfx("coin");
+    showShop();
+  }
+  function buyRepair() {
+    const max = tStats().max;
+    if (money < REPAIR_COST || T.hp >= max) return;
+    money -= REPAIR_COST;
+    T.hp = Math.min(max, T.hp + max * 0.4);
+    sfx("place");
+    showShop();
+  }
+  function nextWave() {
+    state = "play";
+    hideOv();
+    waveState = "prep";
+    timer = 2.5;
+    engineOn();
+  }
+
+  /* ---------- lógica ---------- */
+  function tSpawn(type) {
+    const d = ZD[type],
+      hp = Math.round(d.hp * (1 + (wave - 1) * 0.1));
+    let x, y;
+    if (Math.random() < 0.6) {
+      x = GX + 9.6 * CELL;
+      y = rnd(-0.8, 5.6) * CELL; // estrada de terra à direita
+    } else {
+      x = GX + rnd(3, 9) * CELL;
+      y = -1.6 * CELL; // borda de cima
+    }
+    tz.push({
+      type,
+      d,
+      x,
+      y,
+      hp,
+      max: hp,
+      r: d.big ? 13 : 7,
+      t: rnd(0, 3),
+      fl: 0,
+      bite: false,
+      sc: 1.5,
+      gun: 2,
+      burst: 0,
+      bt: 0,
+      firing: 0,
+    });
+    if (d.big) $("bossbar").hidden = false;
+  }
+  function tHurt(z, dmg, quiet) {
+    if (z.dead) return;
+    z.hp -= dmg;
+    z.fl = 0.07;
+    const [fx0, fy0] = P(z.x, z.y, z.d.big ? 20 : 11);
+    if (!quiet) {
+      gore(fx0, fy0, 3);
+      if (dmg >= 40) txt(fx0, fy0 - 6, dmg);
+    }
+    if (z.hp <= 0) {
+      z.dead = true;
+      kills++;
+      money += z.d.cash;
+      score += z.d.pts;
+      gore(fx0, fy0, z.d.big ? 40 : 16, z.d.big);
+      coins(fx0, fy0 - 4);
+      txt(fx0, fy0 - 12, "+$" + z.d.cash, "140,235,90");
+      sfx("hit");
+      const [sx] = iso(z.x, z.y),
+        [tx] = iso(T.x, T.y);
+      tcorpse.push({ img: IMG["z_" + z.type], h: SPRITE_H["z_" + z.type] * K, x: z.x, y: z.y, t: 0, flip: tx > sx });
+      if (z.d.big) {
+        boom(fx0, fy0, 3);
+        slowT = 0.7;
+        flashA = 0.5;
+        banner("CHEFÃO ABATIDO!");
+      } else if (Math.random() < 0.08)
+        tdrops.push({ x: z.x, y: z.y, kind: Math.random() < 0.5 ? "rep" : "cash", t: 0, life: 12, z0: 0 });
+    }
+  }
+  function explode(x, y, dmg, rad, k) {
+    for (const z of tz) {
+      if (z.dead) continue;
+      const d = Math.hypot(z.x - x, z.y - y) - z.r;
+      if (d <= rad) tHurt(z, dmg * (d <= rad * 0.4 ? 1 : 0.6));
+    }
+    const [fx0, fy0] = P(x, y, 1);
+    boom(fx0, fy0, k);
+  }
+  function inField(x, y) {
+    if (x < GX - 0.2 * CELL || x > GX + 9.1 * CELL || y < -1.5 * CELL || y > 6.4 * CELL) return false;
+    const [sx, sy] = iso(x, y);
+    return sx > 50 && sx < VW - 50 && sy > 95 && sy < VH - 18;
+  }
+  function fireCannon(st) {
+    const cn = CANNON[tcfg.cannon],
+      dx = Math.cos(T.tur),
+      dy = Math.sin(T.tur),
+      piv = [T.x + Math.cos(T.ang) * -2, T.y + Math.sin(T.ang) * -2],
+      R = CHASSIS[tcfg.chassis].W * 0.37,
+      l = R * 0.85 + cn.len + 1,
+      x = piv[0] + dx * l,
+      y = piv[1] + dy * l;
+    tp.push({
+      k: "shell",
+      x,
+      y,
+      h: 9.8,
+      vx: dx * cn.speed,
+      vy: dy * cn.speed,
+      life: cn.range / cn.speed,
+      dmg: st.dmg,
+      splash: cn.splash,
+      bk: cn.k,
+    });
+    T.cd = st.reload;
+    T.rec = 0.22;
+    T.vel -= 14 * cn.k; // coice
+    const [fx0, fy0] = P(x, y, 9.8);
+    G(GL.y, fx0, fy0, { r0: 4 * cn.k, r1: 7 * cn.k, life: 0.09, row: 0 });
+    G(GL.w, fx0, fy0, { r0: 2.4, r1: 3, life: 0.06, row: 0 });
+    G(GL.gs, fx0, fy0, { r0: 16, r1: 20, life: 0.1, a: 0.45, row: 0 });
+    for (let i = 0; i < 6; i++) {
+      const [a, b] = P(x + dx * rnd(2, 10), y + dy * rnd(2, 10), 9.8);
+      G(GL.sl, a, b, {
+        add: false,
+        a: 0.45,
+        smoke: 1,
+        vx: rnd(-8, 8),
+        vy: -rnd(4, 12),
+        r0: 2,
+        r1: rnd(6, 10),
+        life: rnd(0.7, 1.2),
+        drag: 1.5,
+      });
+    }
+    const [bx, by] = P(T.x - Math.cos(T.ang) * 14, T.y - Math.sin(T.ang) * 14, 1);
+    puff(bx, by, 4);
+    trauma = Math.min(1, trauma + 0.12 * cn.k);
+    sfx("cannon");
+  }
+  function fireMG(st) {
+    const R = CHASSIS[tcfg.chassis].W * 0.37,
+      a = T.tur + rnd(-0.05, 0.05),
+      // a metralhadora fica no teto, deslocada para o lado da torreta
+      side = T.tur - Math.PI / 2,
+      ox = T.x + Math.cos(T.ang) * -2 + Math.cos(side) * R * 0.5 + Math.cos(T.tur) * 11,
+      oy = T.y + Math.sin(T.ang) * -2 + Math.sin(side) * R * 0.5 + Math.sin(T.tur) * 11;
+    tp.push({ k: "mg", x: ox, y: oy, h: 12, vx: Math.cos(a) * 560, vy: Math.sin(a) * 560, life: 0.5, dmg: st.mgDmg });
+    T.mgCd = 0.085;
+    T.heat += st.mgHeat;
+    if (T.heat >= 1) {
+      T.over = true;
+      txt(...P(T.x, T.y, 30), "SUPERAQUECEU!", "255,120,80");
+    }
+    const [fx0, fy0] = P(ox, oy, 12);
+    G(GL.y, fx0, fy0, { r0: 1.8, r1: 3, life: 0.05, row: 0 });
+    part(fx0, fy0, rnd(-20, 20), -rnd(30, 50), 0.6, "#d9a440", 1, 260);
+    sfx("shot");
+  }
+  function tUpdate(dt) {
+    const st = tStats();
+    // --- movimento
+    let fwd = (tkeys.has("arrowup") ? 1 : 0) - (tkeys.has("arrowdown") ? 1 : 0),
+      rot = (tkeys.has("arrowright") ? 1 : 0) - (tkeys.has("arrowleft") ? 1 : 0);
+    if (tin.joy) {
+      // joystick: o casco gira para a direção apontada e anda para frente
+      const m = Math.min(1, Math.hypot(tin.joy.x, tin.joy.y));
+      if (m > 0.15) {
+        const want = screenToGroundDir(tin.joy.x, tin.joy.y),
+          d = angDiff(want, T.ang);
+        T.ang = turnTo(T.ang, want, st.turn * 1.3 * dt);
+        fwd = m * Math.max(0, Math.cos(d));
+      }
+    }
+    T.ang += rot * st.turn * dt;
+    const target = fwd * st.speed * (fwd < 0 ? 0.6 : 1);
+    T.vel += (target - T.vel) * Math.min(1, dt * 5);
+    const nx = T.x + Math.cos(T.ang) * T.vel * dt,
+      ny = T.y + Math.sin(T.ang) * T.vel * dt;
+    if (inField(nx, ny)) {
+      T.x = nx;
+      T.y = ny;
+    } else if (inField(nx, T.y)) T.x = nx;
+    else if (inField(T.x, ny)) T.y = ny;
+    else T.vel = 0;
+    T.phase += T.vel * dt * 0.8 + Math.abs(rot) * dt * 10;
+    if (Math.abs(T.vel) > 15 && Math.random() < 0.25) {
+      const [bx, by] = P(T.x - Math.cos(T.ang) * 15, T.y - Math.sin(T.ang) * 15, 0);
+      puff(bx, by, 1);
+    }
+    if (engine) {
+      const f = Math.min(1, Math.abs(T.vel) / st.speed);
+      engine.g.gain.setTargetAtTime(sound ? 0.05 + 0.1 * f : 0, AC.currentTime, 0.08);
+      engine.o.frequency.setTargetAtTime(36 + 34 * f, AC.currentTime, 0.1);
+    }
+    // --- torreta: A/D, mouse ou mira automática (celular)
+    const tr = (tkeys.has("d") ? 1 : 0) - (tkeys.has("a") ? 1 : 0);
+    if (tr) T.tur += tr * 2.8 * dt;
+    else if (tin.mouse) T.tur = turnTo(T.tur, Math.atan2(tin.mouse.y - T.y, tin.mouse.x - T.x), 4 * dt);
+    else if (tin.touch) {
+      let best = null,
+        bd = 330;
+      for (const z of tz) {
+        if (z.dead) continue;
+        const d = Math.hypot(z.x - T.x, z.y - T.y);
+        if (d < bd) {
+          bd = d;
+          best = z;
+        }
+      }
+      if (best) T.tur = turnTo(T.tur, Math.atan2(best.y - T.y, best.x - T.x), 3.2 * dt);
+    }
+    // --- armas
+    T.cd -= dt;
+    T.mgCd -= dt;
+    T.rec = Math.max(0, T.rec - dt);
+    T.fl = Math.max(0, T.fl - dt);
+    const wantCannon = tin.cannon || tkeys.has(" ") || tkeys.has("b"),
+      wantMG = tin.mg || tkeys.has("enter");
+    if (wantCannon && T.cd <= 0) fireCannon(st);
+    if (wantMG && !T.over && T.mgCd <= 0) fireMG(st);
+    T.heat = Math.max(0, T.heat - dt * (wantMG && !T.over ? 0.05 : 0.38));
+    if (T.over && T.heat < 0.3) T.over = false;
+    // --- ondas
+    if (waveState === "prep") {
+      timer -= dt;
+      if (timer <= 0) {
+        wave++;
+        queue = buildWave(wave);
+        spawnT = 1;
+        waveState = "fight";
+        banner(wave === MAX_WAVE ? `ONDA ${wave} · CHEFÃO!` : `ONDA ${wave} / ${MAX_WAVE}`);
+        sfx("wave");
+      }
+    } else {
+      spawnT -= dt;
+      if (spawnT <= 0 && queue.length) {
+        tSpawn(queue.shift());
+        spawnT = Math.max(0.7, 2.6 - wave * 0.17) * rnd(0.6, 1.4);
+      }
+      if (!queue.length && !tz.some((z) => !z.dead)) {
+        score += wave * 500;
+        const b = 40 + wave * 10;
+        money += b;
+        if (wave >= MAX_WAVE) return tEnd(true);
+        engineOff();
+        banner(`ONDA LIMPA! +$${b}`);
+        sfx("coin");
+        setTimeout(() => state === "play" && MODE === "tank" && showShop(), 900);
+        waveState = "done";
+      }
+    }
+    // caixas de suprimento lançadas de paraquedas
+    airT -= dt;
+    if (airT <= 0) {
+      airT = rnd(14, 20);
+      let x, y;
+      do {
+        x = GX + rnd(0.5, 8.5) * CELL;
+        y = rnd(-0.5, 5.5) * CELL;
+      } while (!inField(x, y));
+      tdrops.push({ x, y, kind: Math.random() < 0.5 ? "rep" : "cash", t: 0, life: 14, z0: 70 });
+    }
+    // --- zumbis
+    for (const z of tz) {
+      if (z.dead) continue;
+      z.t += dt;
+      z.fl = Math.max(0, z.fl - dt);
+      z.firing = Math.max(0, z.firing - dt);
+      const d = z.d,
+        dx = T.x - z.x,
+        dy = T.y - z.y,
+        dist = Math.hypot(dx, dy),
+        reach = z.r + 13;
+      let move = true;
+      if (d.gun) {
+        // chefão: rajadas de metralhadora no tanque
+        z.gun -= dt;
+        if (z.burst > 0) {
+          z.bt -= dt;
+          move = false;
+          if (z.bt <= 0) {
+            z.bt = 0.1;
+            z.burst--;
+            z.firing = 0.15;
+            const a = Math.atan2(dy, dx) + rnd(-0.08, 0.08);
+            zp.push({
+              k: "zb",
+              x: z.x + Math.cos(a) * 18,
+              y: z.y + Math.sin(a) * 18,
+              h: 20,
+              vx: Math.cos(a) * 300,
+              vy: Math.sin(a) * 300,
+              life: 1.2,
+              dmg: d.gun,
+            });
+            const [fx0, fy0] = P(z.x + Math.cos(a) * 18, z.y + Math.sin(a) * 18, 20);
+            G(GL.y, fx0, fy0, { r0: 3, r1: 5, life: 0.07, row: 0 });
+            trauma = Math.min(1, trauma + 0.05);
+            sfx("shot");
+          }
+        } else if (z.gun <= 0 && dist < 200) {
+          z.gun = 2.6;
+          z.burst = 6;
+        }
+      }
+      if (d.spit && dist < 115 && dist > reach) {
+        move = false;
+        z.sc -= dt;
+        if (z.sc <= 0) {
+          z.sc = 2.4;
+          const a = Math.atan2(dy, dx);
+          zp.push({
+            k: "acid",
+            x: z.x,
+            y: z.y,
+            h: 14,
+            vx: Math.cos(a) * 110,
+            vy: Math.sin(a) * 110,
+            life: 1.4,
+            dmg: d.spit,
+          });
+          sfx("spit");
+        }
+      }
+      if (dist <= reach) {
+        z.bite = true;
+        T.hp -= d.dps * dt;
+        T.fl = 0.06;
+        move = false;
+        // atropelar: o tanque andando para cima do zumbi machuca
+        if (Math.abs(T.vel) > 20) tHurt(z, 70 * dt * (Math.abs(T.vel) / st.speed), true);
+      } else z.bite = false;
+      if (move) {
+        const sp = d.sp * 2.2;
+        z.x += (dx / dist) * sp * dt;
+        z.y += (dy / dist) * sp * dt;
+      }
+    }
+    // separação entre zumbis e para fora do tanque
+    for (let i = 0; i < tz.length; i++) {
+      const a = tz[i];
+      if (a.dead) continue;
+      for (let j = i + 1; j < tz.length; j++) {
+        const b = tz[j];
+        if (b.dead) continue;
+        const dx = b.x - a.x,
+          dy = b.y - a.y,
+          d = Math.hypot(dx, dy) || 0.01,
+          m = a.r + b.r - d;
+        if (m > 0) {
+          a.x -= (dx / d) * m * 0.5;
+          a.y -= (dy / d) * m * 0.5;
+          b.x += (dx / d) * m * 0.5;
+          b.y += (dy / d) * m * 0.5;
+        }
+      }
+      const dx = a.x - T.x,
+        dy = a.y - T.y,
+        d = Math.hypot(dx, dy) || 0.01,
+        m = a.r + 12 - d;
+      if (m > 0) {
+        a.x += (dx / d) * m;
+        a.y += (dy / d) * m;
+      }
+    }
+    // --- projéteis do tanque
+    for (const p of tp) {
+      p.life -= dt;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      if (p.k === "shell" && Math.random() < 0.7) {
+        const [a, b] = P(p.x, p.y, p.h);
+        G(GL.sl, a, b, { add: false, a: 0.22, smoke: 1, r0: 0.8, r1: 2.6, life: 0.45, row: 0 });
+      }
+      let hit = null;
+      for (const z of tz)
+        if (!z.dead && Math.hypot(z.x - p.x, z.y - p.y) < z.r + 2) {
+          hit = z;
+          break;
+        }
+      if (hit) {
+        p.dead = true;
+        if (p.k === "shell") explode(p.x, p.y, p.dmg, p.splash, p.bk);
+        else {
+          tHurt(hit, p.dmg);
+          const [a, b] = P(p.x, p.y, 10);
+          for (let i = 0; i < 3; i++)
+            add({
+              k: "s",
+              x: a,
+              y: b,
+              vx: rnd(-80, 80),
+              vy: rnd(-60, 10),
+              life: 0.12,
+              max: 0.12,
+              g: 200,
+              col: "255,240,180",
+              row: 0,
+            });
+        }
+      } else if (p.life <= 0) {
+        p.dead = true;
+        if (p.k === "shell") explode(p.x, p.y, p.dmg, p.splash, p.bk);
+      }
+    }
+    // --- projéteis dos zumbis
+    for (const p of zp) {
+      p.life -= dt;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      if (Math.hypot(p.x - T.x, p.y - T.y) < 14) {
+        p.dead = true;
+        T.hp -= p.dmg;
+        T.fl = 0.1;
+        const [a, b] = P(p.x, p.y, 8);
+        if (p.k === "acid") {
+          G(GL.g, a, b, { r0: 3, r1: 10, life: 0.25, a: 0.7, row: 0 });
+          for (let i = 0; i < 6; i++) part(a, b, rnd(-30, 30), -rnd(10, 40), 0.6, "#9be22d", 1, 120);
+        } else
+          for (let i = 0; i < 3; i++)
+            add({
+              k: "s",
+              x: a,
+              y: b,
+              vx: rnd(-90, 90),
+              vy: rnd(-50, 20),
+              life: 0.12,
+              max: 0.12,
+              g: 200,
+              col: "255,240,180",
+              row: 0,
+            });
+      } else if (p.life <= 0) p.dead = true;
+    }
+    // --- caixas
+    for (const c of tdrops) {
+      c.t += dt;
+      c.life -= dt;
+      if (c.z0 > 0) {
+        c.z0 = Math.max(0, c.z0 - 30 * dt);
+        if (c.z0 === 0) puff(...P(c.x, c.y, 0), 5);
+      } else if (Math.hypot(c.x - T.x, c.y - T.y) < 18) {
+        c.life = 0;
+        const [a, b] = P(c.x, c.y, 6);
+        G(GL.y, a, b, { r0: 4, r1: 16, life: 0.3, row: 0 });
+        if (c.kind === "rep") {
+          T.hp = Math.min(st.max, T.hp + st.max * 0.15);
+          txt(a, b - 8, "REPARO +15%", "140,235,90");
+        } else {
+          money += 25;
+          coins(a, b);
+          txt(a, b - 8, "+$25", "255,214,90");
+        }
+        sfx("coin");
+      }
+    }
+    tz = tz.filter((z) => !z.dead);
+    tp = tp.filter((p) => !p.dead);
+    zp = zp.filter((p) => !p.dead);
+    tdrops = tdrops.filter((c) => c.life > 0);
+    for (const c of tcorpse) c.t += dt;
+    tcorpse = tcorpse.filter((c) => c.t < 2.6);
+    if (T.hp <= 0) {
+      T.hp = 0;
+      const [a, b] = P(T.x, T.y, 6);
+      boom(a, b, 3.2);
+      boom(a + 6, b - 4, 2);
+      slowT = 0.8;
+      flashA = 0.6;
+      flashC = "255,120,60";
+      tEnd(false);
+    }
+  }
+
+  /* ---------- desenho do modo tanque ---------- */
+  function tRender() {
+    ctx.save();
+    screenT();
+    ctx.imageSmoothingEnabled = true;
+    ctx.fillStyle = "#0b0f07";
+    ctx.fillRect(0, 0, VW, VH);
+    if (MAPIMG) ctx.drawImage(MAPIMG, -CAM.x, -CAM.y, 1310, 830);
+    ctx.drawImage(tdecal, 0, 0, VW, VH);
+    const M = groundM();
+    // linha de mira pontilhada no chão (PC)
+    if (T && !tin.touch && state === "play") {
+      ctx.setTransform(M[0], M[1], M[2], M[3], M[4], M[5]);
+      ctx.translate(T.x, T.y);
+      ctx.rotate(T.tur);
+      ctx.fillStyle = "rgba(255,240,180,.35)";
+      for (let i = 30; i < 150; i += 8) ctx.fillRect(i, -0.5, 3, 1);
+      screenT();
+    }
+    const list = [];
+    const push = (x, y, f, b = 0) => list.push({ d: iso(x, y)[1] + b, f });
+    for (const c of tcorpse)
+      push(
+        c.x,
+        c.y,
+        () => {
+          const [sx, sy] = iso(c.x, c.y),
+            f = Math.min(1, c.t / 0.35);
+          if (!c.img) return;
+          ctx.save();
+          ctx.globalAlpha = c.t > 1.5 ? Math.max(0, 1 - (c.t - 1.5) / 1.1) : 1;
+          ctx.translate(sx, sy + f * f * 2 * K);
+          ctx.scale(c.flip ? -1 : 1, 1);
+          ctx.rotate(f * f * 1.45);
+          const cw = (c.img.width * c.h) / c.img.height;
+          ctx.drawImage(c.img, -cw / 2, -c.h, cw, c.h);
+          ctx.restore();
+        },
+        -1,
+      );
+    for (const c of tdrops)
+      push(c.x, c.y, () => {
+        if (c.life < 3 && ((c.life * 8) | 0) % 2) return;
+        const [sx, sy0] = iso(c.x, c.y),
+          sy = sy0 - c.z0 * K;
+        if (c.z0 === 0) shadow(sx, sy0, 6 * K);
+        ctx.save();
+        at(sx, sy);
+        if (c.z0 > 0) {
+          ctx.fillStyle = "#141a0e";
+          ctx.fillRect(-7, -15, 15, 5);
+          ctx.fillStyle = "#e9e4cc";
+          ctx.fillRect(-6, -14, 13, 3);
+          ctx.fillStyle = "#141a0e";
+          ctx.fillRect(-6, -11, 1, 6);
+          ctx.fillRect(6, -11, 1, 6);
+        }
+        ctx.fillStyle = "#141a0e";
+        ctx.fillRect(-5, -5, 11, 9);
+        ctx.fillStyle = c.kind === "rep" ? "#d8dcd2" : "#9a6a32";
+        ctx.fillRect(-4, -4, 9, 7);
+        ctx.fillStyle = c.kind === "rep" ? "#c0392b" : "#f2c230";
+        ctx.fillRect(0, -4, 1, 7);
+        ctx.fillRect(-4, -1, 9, 1);
+        ctx.restore();
+      });
+    for (const z of tz)
+      push(
+        z.x,
+        z.y,
+        () => {
+          const [sx, sy0] = iso(z.x, z.y),
+            sy = sy0 + (z.d.big ? 2 * K : 0),
+            im = IMG["z_" + z.type],
+            [tx] = iso(T.x, T.y),
+            flip = tx > sx;
+          shadow(sx, sy, (z.r + 2) * K * 0.9);
+          if (!im) return;
+          const h = SPRITE_H["z_" + z.type] * K;
+          let rot = 0,
+            dy = 0;
+          if (z.bite) rot = -(0.06 + 0.06 * Math.sin(z.t * 18));
+          else if (z.firing > 0) rot = 0.03 * Math.sin(z.t * 40);
+          else {
+            const ph = Math.sin(z.t * (z.type === "runner" ? 14 : z.d.big ? 5 : 7));
+            rot = ph * 0.05;
+            dy = -Math.abs(ph) * 0.8 * K;
+          }
+          drawImg(im, sx, sy + dy, h, { fl: z.fl, rot: flip ? -rot : rot, sx: flip ? -1 : 1 });
+          if (!z.d.big) bar(sx, sy - h - 3 * K, z.hp, z.max);
+        },
+        0.5,
+      );
+    if (T)
+      push(T.x, T.y, () => {
+        drawTank(ctx, M, FS * K, T, tcfg, T.fl);
+        screenT();
+        const [sx, sy] = iso(T.x, T.y);
+        bar(sx, sy - 24 * K, Math.max(1, T.hp), T.hp < tStats().max ? tStats().max : T.hp + 1);
+      });
+    list.sort((a, b) => a.d - b.d);
+    for (const it of list) it.f();
+    // projéteis com brilho
+    ctx.globalCompositeOperation = "lighter";
+    for (const p of [...tp, ...zp]) {
+      const [sx, sy0] = iso(p.x, p.y),
+        sy = sy0 - p.h * K,
+        [ex, ey0] = iso(p.x - p.vx * 0.03, p.y - p.vy * 0.03),
+        ey = ey0 - p.h * K;
+      if (p.k === "acid") {
+        ctx.drawImage(GL.g, sx - 5 * K, sy - 5 * K, 10 * K, 10 * K);
+        continue;
+      }
+      ctx.strokeStyle = p.k === "shell" ? "rgba(255,170,70,.95)" : "rgba(255,228,150,.95)";
+      ctx.lineWidth = (p.k === "shell" ? 1.4 : 0.7) * K;
+      ctx.beginPath();
+      ctx.moveTo(ex, ey);
+      ctx.lineTo(sx, sy);
+      ctx.stroke();
+      const r = (p.k === "shell" ? 4 : 2) * K;
+      ctx.drawImage(p.k === "shell" ? GL.o : GL.y, sx - r, sy - r, r * 2, r * 2);
+    }
+    ctx.globalCompositeOperation = "source-over";
+    // partículas em pixel
+    ctx.setTransform(FS * K, 0, 0, FS * K, 0, 0);
+    for (const p of parts) {
+      ctx.globalAlpha = Math.min(1, (p.life / p.max) * 1.6);
+      ctx.fillStyle = p.col;
+      ctx.fillRect(p.x, p.y, p.s, p.s);
+    }
+    ctx.globalAlpha = 1;
+    screenT();
+    // painel de armas (canhão e calor da metralhadora)
+    if (T) {
+      const st = tStats(),
+        x0 = 18,
+        y0 = VH - 62,
+        w = 170;
+      ctx.fillStyle = "rgba(13,18,8,.8)";
+      ctx.fillRect(x0 - 8, y0 - 8, w + 16, 58);
+      ctx.font = "11px 'Press Start 2P',monospace";
+      ctx.fillStyle = "#e6eed2";
+      ctx.fillText("CANHÃO", x0, y0 + 9);
+      ctx.fillText(T.over ? "SUPERAQUECIDA" : "METRALHADORA", x0, y0 + 35);
+      const f = 1 - Math.max(0, T.cd) / st.reload;
+      ctx.fillStyle = "#000";
+      ctx.fillRect(x0, y0 + 13, w, 7);
+      ctx.fillRect(x0, y0 + 39, w, 7);
+      ctx.fillStyle = f >= 1 ? "#8be04f" : "#f2c230";
+      ctx.fillRect(x0, y0 + 13, w * Math.min(1, f), 7);
+      ctx.fillStyle = T.over ? "#ff5a2a" : T.heat > 0.7 ? "#ff9a3a" : "#e6eed2";
+      ctx.fillRect(x0, y0 + 39, w * T.heat, 7);
+    }
+    if (waveState === "prep" && state === "play") {
+      const f = 1 - timer / 4,
+        w = VW * 0.4;
+      ctx.fillStyle = "rgba(0,0,0,.55)";
+      ctx.fillRect((VW - w) / 2, VH - 16, w, 8);
+      ctx.fillStyle = "#f2c230";
+      ctx.fillRect((VW - w) / 2, VH - 16, w * Math.max(0, f), 8);
+    }
+    ctx.restore();
+  }
+  function tUI() {
+    if (!T) return;
+    const st = tStats(),
+      hp = Math.max(0, Math.ceil((T.hp / st.max) * 100)),
+      s = `t${wave}|${hp}|${score}|${money}`;
+    if (s !== lastUI) {
+      lastUI = s;
+      $("hWave").textContent = String(wave).padStart(2, "0") + "/" + MAX_WAVE;
+      $("hLife").textContent = hp + "%";
+      $("hLife").classList.toggle("low", hp <= 30);
+      $("hScore").textContent = score;
+      $("hMoney").textContent = money;
+    }
+    const boss = tz.find((z) => z.d.big && !z.dead);
+    if (boss) $("bossfill").style.width = Math.max(0, (boss.hp / boss.max) * 100) + "%";
+    else if (!$("bossbar").hidden) $("bossbar").hidden = true;
+  }
+
+  /* ---------- controles ---------- */
+  const TANK_KEYS = new Set(["arrowup", "arrowdown", "arrowleft", "arrowright", "a", "d", " ", "b", "enter"]);
+  function tKey(e, down) {
+    const k = e.key.toLowerCase();
+    if (!TANK_KEYS.has(k)) return false;
+    e.preventDefault();
+    if (down) {
+      tkeys.add(k);
+      tin.touch = false;
+      if (k === "a" || k === "d") tin.mouse = null;
+    } else tkeys.delete(k);
+    return true;
+  }
+  addEventListener("keyup", (e) => {
+    if (MODE === "tank") tKey(e, false);
+  });
+  addEventListener("blur", () => tkeys.clear());
+  // mouse: a torreta segue o ponteiro e o clique atira com o canhão
+  cv.addEventListener("pointermove", (e) => {
+    if (MODE !== "tank" || e.pointerType !== "mouse") return;
+    const p = toLocal(e);
+    tin.mouse = unproject(p.x, p.y);
+    tin.touch = false;
+  });
+  cv.addEventListener("pointerdown", (e) => {
+    if (MODE !== "tank" || state !== "play") return;
+    if (e.pointerType === "mouse") tin.cannon = true;
+  });
+  addEventListener("pointerup", (e) => {
+    if (MODE === "tank" && e.pointerType === "mouse") tin.cannon = false;
+  });
+  // celular: joystick e botões
+  {
+    const joy = $("joy"),
+      knob = joy.querySelector("i");
+    let jid = null;
+    const setJ = (e) => {
+      const r = joy.getBoundingClientRect(),
+        cx = r.left + r.width / 2,
+        cy = r.top + r.height / 2,
+        R = r.width / 2;
+      let dx = (e.clientX - cx) / R,
+        dy = (e.clientY - cy) / R;
+      const m = Math.hypot(dx, dy);
+      if (m > 1) {
+        dx /= m;
+        dy /= m;
+      }
+      tin.joy = { x: dx, y: dy };
+      knob.style.transform = `translate(${dx * R * 0.6}px,${dy * R * 0.6}px)`;
+    };
+    joy.addEventListener("pointerdown", (e) => {
+      audio();
+      jid = e.pointerId;
+      try {
+        joy.setPointerCapture(jid);
+      } catch (err) {}
+      tin.touch = true;
+      tin.mouse = null;
+      setJ(e);
+    });
+    joy.addEventListener("pointermove", (e) => e.pointerId === jid && setJ(e));
+    const end = (e) => {
+      if (e.pointerId !== jid) return;
+      jid = null;
+      tin.joy = null;
+      knob.style.transform = "";
+    };
+    joy.addEventListener("pointerup", end);
+    joy.addEventListener("pointercancel", end);
+    for (const [id, key] of [
+      ["tbCannon", "cannon"],
+      ["tbMG", "mg"],
+    ]) {
+      const b = $(id);
+      b.addEventListener("pointerdown", (e) => {
+        audio();
+        e.preventDefault();
+        try {
+          b.setPointerCapture(e.pointerId);
+        } catch (err) {}
+        tin[key] = true;
+        tin.touch = true;
+        tin.mouse = null;
+        b.classList.add("on");
+      });
+      const up = () => {
+        tin[key] = false;
+        b.classList.remove("on");
+      };
+      b.addEventListener("pointerup", up);
+      b.addEventListener("pointercancel", up);
+    }
+  }
+
   /* ---------- layout + loop ---------- */
   function fit() {
     const st = $("stage");
@@ -3200,7 +4416,7 @@
       slowT -= rdt;
       dt *= 0.3;
     }
-    if (state === "play") for (let i = 0; i < spd; i++) update(dt);
+    if (state === "play") for (let i = 0; i < spd; i++) MODE === "tank" ? tUpdate(dt) : update(dt);
     if (state !== "pause") for (let i = 0; i < (state === "play" ? spd : 1); i++) stepFx(dt);
     trauma = Math.max(0, trauma - rdt * 1.3);
     flashA = Math.max(0, flashA - rdt * 2.2);
@@ -3209,9 +4425,12 @@
       sy = rnd(-1, 1) * off * 0.7,
       tr = `translate(calc(-50% + ${(sx * K * CSS_S).toFixed(1)}px),calc(-50% + ${(sy * K * CSS_S).toFixed(1)}px))`;
     cv.style.transform = fxc.style.transform = tr;
-    render();
+    if (MODE === "tank") tRender();
+    else render();
     drawFx(0, 0);
-    updUI();
+    if (MODE === "tank") tUI();
+    else updUI();
+    if (state === "tsetup") drawPreview(now / 1000);
     music();
     requestAnimationFrame(frame);
   }
