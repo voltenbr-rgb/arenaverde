@@ -1,5 +1,5 @@
 // Arena Verde — service worker: funciona offline e pega versões novas automaticamente.
-const V = "arenaverde-v10";
+const V = "arenaverde-v11";
 const SHELL = [
   "/",
   "/style.css",

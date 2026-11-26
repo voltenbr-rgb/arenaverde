@@ -12,18 +12,22 @@ Cada personagem tem 2 artes, e uma nunca substitui a outra:
 
 O campo é desenhado em alta resolução, então os sprites ficam nítidos e acompanham o tamanho da casa (cerca de 64 px no celular deitado e 80–110 px no PC). Cada sprite tem 2 frames: **parado** (respirando) e **atacando** (recuo). Os zumbis têm frames de andar e de morder.
 
-## Modo Tanque
-No menu, **MODO TANQUE** abre a **Garagem**, onde você escolhe a camuflagem (verde, deserto, neve ou urbano), o canhão (leve, padrão ou pesado) e o chassi (leve, médio ou pesado). Depois você pilota o tanque pelo mapa contra as 10 ondas. Entre as ondas, a **Oficina** vende melhorias com as moedas ganhas: blindagem, munição, recarga, metralhadora, motor e reparo.
+## Modo Tanque (campanha)
+No menu, **MODO TANQUE** abre a **Garagem**, onde você escolhe a camuflagem, o canhão e o chassi. A campanha tem **5 missões** em mapas compridos, com a câmera seguindo o tanque:
 
-| Ação | PC | Celular |
-| --- | --- | --- |
-| Andar / ré | ↑ / ↓ | joystick |
-| Girar o tanque | ← / → | joystick |
-| Girar a torreta | A / D (ou mouse) | mira automática |
-| Canhão | Espaço ou B (ou clique) | botão CANHÃO |
-| Metralhadora | Enter (segure) | botão METRALHADORA |
+1. Saída da Base · 2. Floresta Densa · 3. Deserto Queimado · 4. Cidade em Ruínas · 5. Fortaleza Zumbi (com o Chefão)
 
-A metralhadora esquenta e para por um tempo se você atirar sem parar. Passar por cima dos zumbis com o tanque também causa dano. Caixas de paraquedas dão reparo ou moedas. O código fica na seção `MODO TANQUE` do `game.js`.
+Em cada missão, destrua os **ninhos de zumbi** e chegue à **extração** (bandeira no fim do mapa). Tudo pode ser destruído: árvores, cercas e caixas o tanque esmaga passando por cima; barris e carros explodem em cadeia; sacos de areia, pedras, cabanas, torres e prédios caem com o canhão. Caixas e construções podem deixar reparo ou moedas. Entre as missões, a **Oficina** vende melhorias. O progresso, as moedas e as melhorias ficam salvos no aparelho.
+
+| Ação | PC | Controle PS4 | Celular (tela cheia) |
+| --- | --- | --- | --- |
+| Andar / girar | ↑ ↓ ← → | analógico esquerdo (ou direcional) | analógico esquerdo |
+| Torreta | A / D ou mouse | analógico direito | analógico direito |
+| Canhão | Espaço, B ou clique | R2, R1 ou X | botão CANHÃO |
+| Metralhadora | Enter (segure) | L2, L1 ou □ | botão METRALHADORA |
+| Pausa | P ou Esc | OPTIONS | botão II |
+
+O código fica na seção `MODO TANQUE` do `game.js`: as missões estão em `MISSIONS`, os temas em `THEMES` e os objetos destrutíveis em `OBJ`.
 
 ## Vista isométrica
 O campo é desenhado em ângulo isométrico, sobre o cenário `public/assets/maps/arena.jpg` (muralhas, torre, bunker, barracas). A lógica do jogo continua numa grade simples 5×9; só o desenho e o toque são projetados no tabuleiro inclinado (veja `ISO`, `iso()` e `unproject()` no `game.js`). Para trocar o mapa, substitua a imagem e ajuste `ISO` (canto do tabuleiro e tamanho de uma casa).

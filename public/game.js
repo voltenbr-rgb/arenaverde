@@ -1207,16 +1207,7 @@
     add(p);
   }
   function scorch(x, y, r) {
-    if (MODE === "tank") {
-      // modo tanque: mancha na camada de tela
-      for (let i = 0; i < 3; i++) {
-        tdc.fillStyle = `rgba(22,16,8,${0.18 + i * 0.1})`;
-        tdc.beginPath();
-        tdc.ellipse(x * K, y * K, r * K * (1 - i * 0.3), r * K * 0.5 * (1 - i * 0.3), 0, 0, 7);
-        tdc.fill();
-      }
-      return;
-    }
+    if (MODE === "tank") return tScorch(x, y, r); // modo tanque: lista de manchas do mundo
     for (let i = 0; i < 3; i++) {
       dc.fillStyle = `rgba(22,16,8,${0.22 + i * 0.12})`;
       dc.beginPath();
@@ -1225,11 +1216,7 @@
     }
   }
   function splat(x, y, c) {
-    if (MODE === "tank") {
-      tdc.fillStyle = c || "rgba(70,150,30,.6)";
-      tdc.fillRect(x * K, y * K, K * 1.4, K * 0.9);
-      return;
-    }
+    if (MODE === "tank") return tSplat(x, y, c);
     dc.fillStyle = c || "rgba(70,150,30,.6)";
     dc.fillRect(x | 0, y | 0, 1 + ((Math.random() * 2) | 0), 1);
   }
@@ -2756,7 +2743,7 @@
   $("bRestart").onclick = () => {
     audio();
     if (MODE === "tank") {
-      if (state !== "menu" && state !== "tsetup") tStart();
+      if (state !== "menu" && state !== "tsetup") tRetry();
     } else if (state === "play" || state === "pause" || state === "over") startGame(false);
   };
 
@@ -2962,8 +2949,13 @@
       store.set("squad", ORDER);
       buildDeck();
       startGame(false);
-    } else if (k === "restart") MODE === "tank" ? tStart() : startGame(false);
-    else if (k === "tsetup") showTankSetup();
+    } else if (k === "restart") MODE === "tank" ? tRetry() : startGame(false);
+    else if (k === "tretry") tRetry();
+    else if (k === "treset") {
+      camp = { m: 0, money: 100, lv: {}, score: 0 };
+      saveCamp();
+      tStart();
+    } else if (k === "tsetup") showTankSetup();
     else if (k === "tgo") {
       store.set("tank", tcfg);
       tStart();
@@ -3219,13 +3211,13 @@
   }
 
   /* ==========================================================================
-     MODO TANQUE
-     O jogador pilota um tanque pelo mapa isométrico e enfrenta as ondas.
-     Coordenadas do mundo = as mesmas da grade (x, y no chão, em unidades);
-     h = altura acima do chão. iso(x,y) projeta para a tela.
+     MODO TANQUE (campanha)
+     O jogador pilota um tanque por mapas compridos, destrói objetos e ninhos
+     de zumbi e chega à extração. h = altura acima do chão.
      Teclado: ↑↓ anda · ←→ gira o casco · A/D gira a torreta ·
               Espaço ou B = canhão · Enter = metralhadora (segure)
-     Celular: joystick (esquerda) + botões CANHÃO e METRALHADORA; mira automática.
+     Controle (PS4): analógico esq. anda · dir. mira · R2/R1/X canhão · L2/L1/□ metralhadora
+     Celular: tela cheia, analógico esquerdo anda, direito gira a torreta, botões de tiro.
      ========================================================================== */
   const CAMO = {
     verde: { n: "Verde", base: "#5b7530", side: "#2f3f18", dark: "#3d521f", blobs: ["#41571f", "#7a9442", "#2a3814"] },
@@ -3300,19 +3292,8 @@
   const REPAIR_COST = 60;
   let tcfg = Object.assign({ camo: "verde", cannon: "padrao", chassis: "medio" }, store.get("tank") || {});
   let tankBest = +(store.get("tankBest") || 0);
-  let T = null, // o tanque
-    tz = [], // zumbis
-    tp = [], // projéteis do tanque
-    zp = [], // projéteis dos zumbis
-    tcorpse = [],
-    tdrops = [],
-    lv = {},
-    airT = 12;
   const tkeys = new Set();
-  const tin = { joy: null, cannon: false, mg: false, touch: false, mouse: null };
-  // manchas (crateras, sangue) do modo tanque: em espaço de tela
-  const tdecal = mk(VW, VH),
-    tdc = tdecal.getContext("2d");
+  const tin = { joy: null, joy2: null, cannon: false, mg: false, touch: false, mouse: null };
   // manchas de camuflagem (posições fixas, em fração do casco)
   const BLOBS = [];
   {
@@ -3321,16 +3302,6 @@
     for (let i = 0; i < 11; i++)
       BLOBS.push({ x: r() * 2 - 1, y: r() * 2 - 1, rx: 2 + r() * 3.5, ry: 1.4 + r() * 2.4, a: r() * 3, c: i % 3 });
   }
-  // ponto do mundo -> espaço dos efeitos (tela ÷ K)
-  const P = (x, y, h = 0) => {
-    const [sx, sy] = iso(x, y);
-    return [sx / K, sy / K - h];
-  };
-  // vetor na tela -> direção no chão
-  const screenToGroundDir = (dx, dy) => {
-    const det = ISO.cx * ISO.ry - ISO.rx * ISO.cy;
-    return Math.atan2((-ISO.cy * dx + ISO.cx * dy) / det, (ISO.ry * dx - ISO.rx * dy) / det);
-  };
   const angDiff = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
   const turnTo = (a, target, max) => {
     const d = angDiff(target, a);
@@ -3466,16 +3437,7 @@
     c.fillRect(2, -R * 0.6 + 0.6, 9, 0.9);
     c.restore();
   }
-  const groundM = () => [
-    (FS * ISO.cx) / CELL,
-    (FS * ISO.cy) / CELL,
-    (FS * ISO.rx) / CELL,
-    (FS * ISO.ry) / CELL,
-    FS * (ISO.ox - (GX * ISO.cx) / CELL),
-    FS * (ISO.oy - (GX * ISO.cy) / CELL),
-  ];
 
-  /* ---------- início / fim ---------- */
   let engine = null;
   function engineOn() {
     try {
@@ -3504,16 +3466,295 @@
     } catch (e) {}
     engine = null;
   }
+
+  /* ==========================================================================
+     CAMPANHA DO TANQUE
+     Mundo comprido (L casas de comprimento × W de largura), com câmera que segue
+     o tanque. Coordenadas do mundo em unidades (1 casa = CELL). wiso() projeta
+     para a "tela do mundo"; a câmera (cam) é subtraída ao desenhar.
+     ========================================================================== */
+  const MISSIONS = [
+    {
+      n: "Saída da Base",
+      L: 44,
+      theme: "grama",
+      nests: 2,
+      zs: ["normal", "runner"],
+      trees: 0.5,
+      intro: "Destrua os ninhos e chegue à extração",
+    },
+    {
+      n: "Floresta Densa",
+      L: 52,
+      theme: "floresta",
+      nests: 3,
+      zs: ["normal", "runner", "armored"],
+      trees: 1.6,
+      intro: "A mata esconde os zumbis. Use o canhão nas árvores!",
+    },
+    {
+      n: "Deserto Queimado",
+      L: 56,
+      theme: "deserto",
+      nests: 3,
+      zs: ["normal", "runner", "armored", "spitter"],
+      trees: 0.3,
+      intro: "Cuidado com os barris: eles explodem",
+    },
+    {
+      n: "Cidade em Ruínas",
+      L: 60,
+      theme: "cidade",
+      nests: 4,
+      zs: ["normal", "runner", "armored", "spitter"],
+      trees: 0.2,
+      intro: "Derrube os prédios para abrir caminho",
+    },
+    {
+      n: "Fortaleza Zumbi",
+      L: 64,
+      theme: "fortaleza",
+      nests: 5,
+      zs: ["normal", "runner", "armored", "spitter"],
+      trees: 0.4,
+      boss: true,
+      intro: "O Chefão protege a extração. Acabe com ele!",
+    },
+  ];
+  const THEMES = {
+    grama: {
+      g: ["#5aa83b", "#4e9a32"],
+      tuft: "#3e8128",
+      road: "#8a6a42",
+      road2: "#7a5c38",
+      edge: "#2c4a1c",
+      leaf: ["#2e6a1e", "#3f8a2a", "#58a838"],
+      rock: "#8d8f86",
+    },
+    floresta: {
+      g: ["#3f8a2a", "#367a24"],
+      tuft: "#2a6219",
+      road: "#6e5234",
+      road2: "#5f462c",
+      edge: "#1a3311",
+      leaf: ["#1f4f17", "#2e6a1e", "#3f7f26"],
+      rock: "#7a7c74",
+    },
+    deserto: {
+      g: ["#d2b47a", "#c8a86c"],
+      tuft: "#b08f58",
+      road: "#a8855a",
+      road2: "#9a784f",
+      edge: "#a88a58",
+      leaf: ["#6e7a3a", "#88904a", "#a0a45a"],
+      rock: "#a08766",
+    },
+    cidade: {
+      g: ["#7c8078", "#72766e"],
+      tuft: "#5e625b",
+      road: "#4a4d50",
+      road2: "#404346",
+      edge: "#3a3d3a",
+      leaf: ["#3d5a26", "#4f6f30", "#62853a"],
+      rock: "#8a8c88",
+    },
+    fortaleza: {
+      g: ["#5a6b3a", "#506034"],
+      tuft: "#3f4d28",
+      road: "#5b4632",
+      road2: "#4e3c2a",
+      edge: "#232b16",
+      leaf: ["#2a3d1a", "#3b5224", "#4a632b"],
+      rock: "#6b6d66",
+    },
+  };
+  // objetos destrutíveis: r = raio de colisão, block = bloqueia, crush = o tanque esmaga andando
+  const OBJ = {
+    tree: { hp: 40, r: 6, block: true, crush: true, pts: 20 },
+    barrel: { hp: 20, r: 4, block: true, crush: false, pts: 30 },
+    crate: { hp: 25, r: 5, block: true, crush: true, pts: 25 },
+    bags: { hp: 90, r: 8, block: true, crush: false, pts: 40 },
+    fence: { hp: 12, r: 7, block: true, crush: true, pts: 10 },
+    rock: { hp: 160, r: 7, block: true, crush: false, pts: 30 },
+    hut: { hp: 220, r: 15, block: true, crush: false, pts: 150 },
+    tower: { hp: 120, r: 9, block: true, crush: false, pts: 120 },
+    ruin: { hp: 320, r: 18, block: true, crush: false, pts: 200 },
+    car: { hp: 70, r: 9, block: true, crush: false, pts: 60 },
+    nest: { hp: 300, r: 14, block: true, crush: false, pts: 1000 },
+  };
+  const VIEW = { w: 1230, h: 640 }; // tela virtual do modo tanque (largura acompanha a tela)
+  const cam = { x: 0, y: 0 };
+  let T = null,
+    LV = null, // nível atual: { m, L, W, theme, objs, decor, ex }
+    tz = [],
+    tp = [],
+    zp = [],
+    tcorpse = [],
+    tdrops = [],
+    tdec = [], // manchas no chão (crateras, sangue, entulho) em espaço de efeitos
+    lv = {},
+    camp = Object.assign({ m: 0, money: 100, lv: {}, score: 0 }, store.get("tankCamp") || {}),
+    snap = null, // estado salvo no início da missão (para tentar de novo)
+    hint = "";
+  const W_CELLS = 11;
+  // mundo -> tela do mundo (sem câmera)
+  const wiso = (x, y) => [(x * ISO.cx + y * ISO.rx) / CELL, (x * ISO.cy + y * ISO.ry) / CELL];
+  // tela do mundo -> mundo
+  const wunproject = (sx, sy) => {
+    const det = ISO.cx * ISO.ry - ISO.rx * ISO.cy;
+    return { x: ((ISO.ry * sx - ISO.rx * sy) / det) * CELL, y: ((-ISO.cy * sx + ISO.cx * sy) / det) * CELL };
+  };
+  // ponto do mundo -> espaço dos efeitos (tela do mundo ÷ K)
+  const P = (x, y, h = 0) => {
+    const [sx, sy] = wiso(x, y);
+    return [sx / K, sy / K - h];
+  };
+  const screenToGroundDir = (dx, dy) => {
+    const det = ISO.cx * ISO.ry - ISO.rx * ISO.cy;
+    return Math.atan2((-ISO.cy * dx + ISO.cx * dy) / det, (ISO.ry * dx - ISO.rx * dy) / det);
+  };
+  const groundM = () => [
+    (FS * ISO.cx) / CELL,
+    (FS * ISO.cy) / CELL,
+    (FS * ISO.rx) / CELL,
+    (FS * ISO.ry) / CELL,
+    -cam.x * FS,
+    -cam.y * FS,
+  ];
+  const roadY = (x) => (W_CELLS / 2 + 2.3 * Math.sin((x / CELL) * 0.16 + (LV ? LV.m * 1.7 : 0))) * CELL;
+  const hash = (a, b) => {
+    const h = Math.sin(a * 127.1 + b * 311.7) * 43758.5453;
+    return h - Math.floor(h);
+  };
+  // manchas do chão do modo tanque (chamadas por scorch/splat)
+  function tScorch(x, y, r) {
+    tdec.push({ k: "s", x, y, r });
+    if (tdec.length > 420) tdec.splice(0, tdec.length - 420);
+  }
+  function tSplat(x, y, c) {
+    tdec.push({ k: "p", x, y, c: c || "rgba(70,150,30,.6)" });
+    if (tdec.length > 420) tdec.splice(0, tdec.length - 420);
+  }
+
+  /* ---------- geração do nível ---------- */
+  function buildLevel(m) {
+    const M = MISSIONS[m],
+      Lc = M.L,
+      Wc = W_CELLS;
+    let sd = 1000 + m * 77;
+    const R = () => (sd = (sd * 9301 + 49297) % 233280) / 233280;
+    LV = { m, L: Lc * CELL, W: Wc * CELL, theme: THEMES[M.theme], objs: [], decor: [], ex: null, M };
+    const objs = LV.objs;
+    const nearRoad = (x, y, pad) => Math.abs(y - roadY(x)) < pad * CELL;
+    const free = (x, y, r) => objs.every((o) => Math.hypot(o.x - x, o.y - y) > o.r + r + 4) && x > 4 * CELL;
+    const put = (type, x, y, o = {}) => {
+      const d = OBJ[type];
+      if (!free(x, y, d.r)) return null;
+      const ob = Object.assign({ type, x, y, hp: d.hp, max: d.hp, r: d.r, ang: 0, fl: 0, seed: R() }, o);
+      objs.push(ob);
+      return ob;
+    };
+    // árvores e pedras fora da estrada
+    const nTrees = Math.round(Lc * 2.2 * M.trees + 10);
+    for (let i = 0; i < nTrees * 3 && objs.length < nTrees; i++) {
+      const x = R() * Lc * CELL,
+        y = (0.5 + R() * (Wc - 1)) * CELL;
+      if (!nearRoad(x, y, 1.6)) put(M.theme === "deserto" && R() < 0.5 ? "rock" : "tree", x, y);
+    }
+    for (let i = 0; i < Lc / 4; i++) {
+      const x = R() * Lc * CELL,
+        y = (0.5 + R() * (Wc - 1)) * CELL;
+      if (!nearRoad(x, y, 1.4)) put("rock", x, y);
+    }
+    // grupos de barris e caixas
+    for (let i = 0; i < Lc / 3; i++) {
+      const x = (6 + R() * (Lc - 10)) * CELL,
+        y = (1 + R() * (Wc - 2)) * CELL;
+      const n = 2 + ((R() * 3) | 0);
+      for (let k = 0; k < n; k++) put(R() < 0.55 ? "barrel" : "crate", x + (R() - 0.5) * 30, y + (R() - 0.5) * 30);
+    }
+    // barricadas atravessando a estrada
+    for (let x = 12 * CELL; x < (Lc - 8) * CELL; x += (7 + R() * 6) * CELL) {
+      const y = roadY(x);
+      if (R() < 0.55) {
+        put("bags", x, y - 12, { ang: 1.57 });
+        put("bags", x, y + 12, { ang: 1.57 });
+      } else for (let k = -2; k <= 2; k++) put("fence", x, y + k * 15, { ang: 1.57 });
+    }
+    // construções por tema
+    const nB = M.theme === "cidade" ? Lc / 3 : Lc / 9;
+    for (let i = 0; i < nB; i++) {
+      const x = (6 + R() * (Lc - 10)) * CELL,
+        y = (R() < 0.5 ? 1.6 + R() * 2 : Wc - 1.6 - R() * 2) * CELL;
+      const t = M.theme === "cidade" ? (R() < 0.7 ? "ruin" : "car") : R() < 0.5 ? "hut" : "tower";
+      put(t, x, y, { ang: R() < 0.5 ? 0 : 1.57 });
+    }
+    if (M.theme === "cidade" || M.theme === "fortaleza")
+      for (let i = 0; i < Lc / 5; i++)
+        put("car", (6 + R() * (Lc - 10)) * CELL, roadY(0) + (R() - 0.5) * 4 * CELL, { ang: R() * 3 });
+    // ninhos (objetivo), espalhados ao longo do mapa
+    for (let i = 0; i < M.nests; i++) {
+      const fx = (i + 1) / (M.nests + 1),
+        x = (8 + fx * (Lc - 16)) * CELL;
+      let y = (R() < 0.5 ? 2.5 : Wc - 2.5) * CELL;
+      for (let k = 0; k < 20; k++) {
+        if (put("nest", x + k * 8, y, { hp: 300 + m * 80, max: 300 + m * 80, spawnT: 2, nest: true })) break;
+        y = (2 + R() * (Wc - 4)) * CELL;
+      }
+    }
+    // zumbis espalhados, dormindo até o tanque chegar perto
+    LV.sleepers = [];
+    for (let i = 0; i < Lc * 0.6; i++) {
+      const x = (8 + R() * (Lc - 10)) * CELL,
+        y = (1 + R() * (Wc - 2)) * CELL;
+      LV.sleepers.push({ x, y, type: M.zs[(R() * M.zs.length) | 0] });
+    }
+    // extração no fim
+    LV.ex = { x: (Lc - 2.5) * CELL, y: roadY((Lc - 2.5) * CELL) };
+    if (M.boss) LV.sleepers.push({ x: (Lc - 6) * CELL, y: roadY((Lc - 6) * CELL), type: "boss" });
+    // árvores decorativas fora do mapa (bordas)
+    for (let x = -6 * CELL; x < (Lc + 6) * CELL; x += 14 + R() * 14) {
+      LV.decor.push({ x, y: -(0.6 + R() * 2.2) * CELL, s: 1 + R() * 0.6, seed: R() });
+      LV.decor.push({ x, y: (Wc + 0.6 + R() * 2.2) * CELL, s: 1 + R() * 0.6, seed: R() });
+    }
+    for (let y = 0; y < Wc * CELL; y += 16 + R() * 10) {
+      LV.decor.push({ x: -(0.8 + R() * 2) * CELL, y, s: 1 + R() * 0.5, seed: R() });
+      LV.decor.push({ x: (Lc + 0.8 + R() * 2) * CELL, y, s: 1 + R() * 0.5, seed: R() });
+    }
+  }
+
+  /* ---------- início / fim de missão ---------- */
+  function saveCamp() {
+    store.set("tankCamp", camp);
+  }
+  function goFullscreen() {
+    try {
+      const el = document.documentElement;
+      if (!document.fullscreenElement && el.requestFullscreen && matchMedia("(pointer: coarse)").matches)
+        el.requestFullscreen({ navigationUI: "hide" })
+          .then(
+            () => screen.orientation && screen.orientation.lock && screen.orientation.lock("landscape").catch(() => {}),
+          )
+          .catch(() => {});
+    } catch (e) {}
+  }
   function tStart() {
     MODE = "tank";
     document.body.classList.add("tank");
     reset();
     $("banner").classList.remove("show");
-    lv = {};
+    goFullscreen();
+    if (camp.m >= MISSIONS.length) camp.m = 0;
+    lv = Object.assign({}, camp.lv);
+    money = camp.money;
+    score = camp.score;
+    snap = { money: camp.money, lv: Object.assign({}, camp.lv), score: camp.score };
+    buildLevel(camp.m);
+    wave = camp.m + 1;
     const st = tStats();
     T = {
-      x: GX + 2.2 * CELL,
-      y: 2.5 * CELL,
+      x: 2 * CELL,
+      y: roadY(2 * CELL),
       ang: 0,
       tur: 0,
       vel: 0,
@@ -3531,16 +3772,20 @@
     zp = [];
     tcorpse = [];
     tdrops = [];
-    airT = 12;
-    money = 100;
-    tdc.clearRect(0, 0, VW, VH);
-    waveState = "prep";
-    timer = 4;
+    tdec = [];
+    kills = 0;
     state = "play";
+    waveState = "fight";
     hideOv();
+    fit();
+    const [sx, sy] = wiso(T.x, T.y);
+    cam.x = sx - VIEW.w * 0.35;
+    cam.y = sy - VIEW.h * 0.55;
     audio();
     engineOn();
-    banner("PILOTE O TANQUE!", 2.2);
+    banner(`MISSÃO ${camp.m + 1}: ${LV.M.n.toUpperCase()}`, 2.6);
+    hint = LV.M.intro;
+    setTimeout(() => state === "play" && MODE === "tank" && banner(LV.M.intro.toUpperCase(), 3), 2800);
   }
   function tExit() {
     engineOff();
@@ -3548,28 +3793,59 @@
     document.body.classList.remove("tank");
     tkeys.clear();
     tin.cannon = tin.mg = false;
-    tin.joy = null;
+    tin.joy = tin.joy2 = null;
+    try {
+      if (document.fullscreenElement) document.exitFullscreen();
+    } catch (e) {}
+    fit();
   }
   function tEnd(won) {
     if (state !== "play") return;
     state = "over";
     engineOff();
     sfx(won ? "wave" : "lose");
-    const nb = score > tankBest;
-    if (nb) {
-      tankBest = score;
-      store.set("tankBest", tankBest);
+    if (won) {
+      const bonus = 150 + camp.m * 50;
+      money += bonus;
+      score += 2000 + camp.m * 1000;
+      camp.m++;
+      camp.money = money;
+      camp.lv = Object.assign({}, lv);
+      camp.score = score;
+      saveCamp();
+      if (score > tankBest) {
+        tankBest = score;
+        store.set("tankBest", tankBest);
+      }
+      const last = camp.m >= MISSIONS.length;
+      setTimeout(() => {
+        if (last) {
+          showOv(`<h2 class="title" style="font-size:clamp(24px,6vw,42px)">CAMPANHA<br>CONCLUÍDA!</h2><p class="sub">Você destruiu a Fortaleza Zumbi</p>
+ <div class="res"><div>PONTOS<b>${score}</b></div><div>RECORDE<b>${tankBest}</b></div></div>
+ <button class="big" data-a="treset">NOVA CAMPANHA</button><button class="alt" data-a="menu">MENU</button>`);
+          camp = { m: 0, money: 100, lv: {}, score: 0 };
+          saveCamp();
+        } else showShop(bonus);
+      }, 1400);
+    } else {
+      setTimeout(
+        () =>
+          showOv(`<h2 class="title" style="font-size:clamp(24px,6vw,42px)">TANQUE<br>DESTRUÍDO</h2><p class="sub">Missão ${camp.m + 1}: ${LV.M.n}</p>
+ <div class="res"><div>ABATES<b>${kills}</b></div><div>NINHOS<b>${LV.objs.filter((o) => o.nest && o.dead).length}/${LV.M.nests}</b></div></div>
+ <button class="big" data-a="tretry">TENTAR DE NOVO</button><button class="alt" data-a="tsetup">GARAGEM</button><button class="alt" data-a="menu">MENU</button>`),
+        1200,
+      );
     }
-    setTimeout(
-      () =>
-        showOv(`<h2 class="title" style="font-size:clamp(24px,6vw,42px)">${won ? "VITÓRIA!" : "TANQUE<br>DESTRUÍDO"}</h2><p class="sub">${won ? "Você limpou as " + MAX_WAVE + " ondas!" : nb ? "NOVO RECORDE!" : "A horda venceu desta vez"}</p>
- <div class="res"><div>PONTOS<b>${score}</b></div><div>ONDA<b>${wave}/${MAX_WAVE}</b></div><div>ABATES<b>${kills}</b></div><div>RECORDE<b>${tankBest}</b></div></div>
- <button class="big" data-a="tgo">JOGAR NOVAMENTE</button><button class="alt" data-a="tsetup">GARAGEM</button><button class="alt" data-a="menu">MENU</button>`),
-      won ? 1500 : 1200,
-    );
+  }
+  function tRetry() {
+    camp.money = snap.money;
+    camp.lv = snap.lv;
+    camp.score = snap.score;
+    saveCamp();
+    tStart();
   }
 
-  /* ---------- telas: garagem (personalização) e oficina (melhorias) ---------- */
+  /* ---------- telas: garagem e oficina ---------- */
   function optRow(title, group, table, extra) {
     return `<div class="trow"><span class="tlab">${title}</span><div class="topts">${Object.keys(table)
       .map(
@@ -3581,15 +3857,16 @@
   function showTankSetup() {
     state = "tsetup";
     const ch = CHASSIS[tcfg.chassis],
-      cn = CANNON[tcfg.cannon];
-    showOv(`<h2 class="title" style="font-size:clamp(22px,5vw,40px)">GARAGEM</h2><p class="sub">Monte seu tanque de guerra</p>
+      cn = CANNON[tcfg.cannon],
+      m = Math.min(camp.m, MISSIONS.length - 1);
+    showOv(`<h2 class="title" style="font-size:clamp(22px,5vw,40px)">GARAGEM</h2><p class="sub">Campanha · Missão ${m + 1}/${MISSIONS.length}: ${MISSIONS[m].n}</p>
  <canvas id="tprev" width="560" height="300"></canvas>
- <div class="tstats"><span>VIDA <b>${ch.hp}</b></span><span>VELOC. <b>${ch.speed}</b></span><span>DANO <b>${cn.dmg}</b></span><span>RECARGA <b>${cn.reload}s</b></span></div>
+ <div class="tstats"><span>VIDA <b>${ch.hp}</b></span><span>VELOC. <b>${ch.speed}</b></span><span>DANO <b>${cn.dmg}</b></span><span>RECARGA <b>${cn.reload}s</b></span><span>MOEDAS <b>${camp.money}</b></span></div>
  ${optRow("CAMUFLAGEM", "camo", CAMO)}
  ${optRow("CANHÃO", "cannon", CANNON, (o) => o.desc)}
  ${optRow("CHASSI", "chassis", CHASSIS, (o) => o.desc)}
- <p class="hint">PC: ↑↓ anda · ←→ gira · A/D torreta (ou mouse) · ESPAÇO/B canhão · ENTER metralhadora<br>Celular: joystick à esquerda, botões à direita, mira automática</p>
- <button class="big" data-a="tgo">INICIAR BATALHA ▶</button><button class="alt" data-a="menu">VOLTAR</button>`);
+ <p class="hint">PC: ↑↓ anda · ←→ gira · A/D torreta (ou mouse) · ESPAÇO/B canhão · ENTER metralhadora<br>Controle (PS4): analógico esquerdo anda · direito mira · R2/R1/X canhão · L2/L1/□ metralhadora · OPTIONS pausa<br>Celular: tela cheia, analógico esquerdo anda e direito gira a torreta</p>
+ <button class="big" data-a="tgo">${camp.m > 0 ? "CONTINUAR CAMPANHA ▶" : "INICIAR CAMPANHA ▶"}</button>${camp.m > 0 ? '<button class="alt" data-a="treset">RECOMEÇAR</button>' : ""}<button class="alt" data-a="menu">VOLTAR</button>`);
     drawPreview(0);
   }
   function drawPreview(time) {
@@ -3613,58 +3890,39 @@
       tcfg,
     );
   }
-  function showShop() {
+  function showShop(bonus) {
     state = "shop";
-    const st = tStats();
-    showOv(`<h2 class="title" style="font-size:clamp(22px,5vw,40px)">OFICINA</h2><p class="sub">Onda ${wave} limpa! Melhore o tanque antes da próxima</p>
- <div class="bbar" style="position:static;margin-bottom:10px"><span><i class="coin"></i>MOEDAS: ${money}</span><span>VIDA ${Math.ceil(T.hp)}/${st.max}</span></div>
+    const st = tStats(),
+      next = MISSIONS[camp.m];
+    showOv(`<h2 class="title" style="font-size:clamp(22px,5vw,40px)">MISSÃO<br>CUMPRIDA!</h2><p class="sub">${bonus ? `Bônus +$${bonus} · ` : ""}Oficina: melhore o tanque para a missão ${camp.m + 1}: ${next.n}</p>
+ <div class="bbar" style="position:static;margin-bottom:10px"><span><i class="coin"></i>MOEDAS: ${money}</span><span>PONTOS ${score}</span></div>
  <div class="ugrid">${UPG.map((u) => {
    const l = lv[u.k] || 0,
      cost = UPG_COST[l];
    return `<div class="ucard"><div class="nm">${u.n}</div><div class="d">${u.desc}</div><div class="lvl">${"★".repeat(l)}${"☆".repeat(3 - l)}</div>${l >= 3 ? '<div class="lock">NÍVEL MÁXIMO</div>' : `<button class="alt" data-a="tup" data-k="${u.k}" ${money < cost ? "disabled" : ""} style="margin:0"><i class="coin"></i>${cost}</button>`}</div>`;
- }).join(
-   "",
- )}<div class="ucard"><div class="nm">Reparo</div><div class="d">Recupera 40% da vida</div><div class="lvl">🔧</div><button class="alt" data-a="trep" ${money < REPAIR_COST || T.hp >= st.max ? "disabled" : ""} style="margin:0"><i class="coin"></i>${REPAIR_COST}</button></div></div>
- <button class="big" data-a="tnext">PRÓXIMA ONDA ▶</button>`);
+ }).join("")}</div>
+ <button class="big" data-a="tnext">PRÓXIMA MISSÃO ▶</button><button class="alt" data-a="tsetup">GARAGEM</button>`);
   }
   function buyUpgrade(k) {
     const l = lv[k] || 0;
     if (l >= 3 || money < UPG_COST[l]) return;
-    const before = tStats().max;
     money -= UPG_COST[l];
     lv[k] = l + 1;
-    if (k === "armor") T.hp += tStats().max - before;
+    camp.money = money;
+    camp.lv = Object.assign({}, lv);
+    saveCamp();
     sfx("coin");
     showShop();
   }
-  function buyRepair() {
-    const max = tStats().max;
-    if (money < REPAIR_COST || T.hp >= max) return;
-    money -= REPAIR_COST;
-    T.hp = Math.min(max, T.hp + max * 0.4);
-    sfx("place");
-    showShop();
-  }
+  function buyRepair() {}
   function nextWave() {
-    state = "play";
-    hideOv();
-    waveState = "prep";
-    timer = 2.5;
-    engineOn();
+    tStart();
   }
 
-  /* ---------- lógica ---------- */
-  function tSpawn(type) {
+  /* ---------- combate ---------- */
+  function tSpawn(type, x, y) {
     const d = ZD[type],
-      hp = Math.round(d.hp * (1 + (wave - 1) * 0.1));
-    let x, y;
-    if (Math.random() < 0.6) {
-      x = GX + 9.6 * CELL;
-      y = rnd(-0.8, 5.6) * CELL; // estrada de terra à direita
-    } else {
-      x = GX + rnd(3, 9) * CELL;
-      y = -1.6 * CELL; // borda de cima
-    }
+      hp = Math.round(d.hp * (1 + camp.m * 0.18));
     tz.push({
       type,
       d,
@@ -3702,31 +3960,135 @@
       coins(fx0, fy0 - 4);
       txt(fx0, fy0 - 12, "+$" + z.d.cash, "140,235,90");
       sfx("hit");
-      const [sx] = iso(z.x, z.y),
-        [tx] = iso(T.x, T.y);
-      tcorpse.push({ img: IMG["z_" + z.type], h: SPRITE_H["z_" + z.type] * K, x: z.x, y: z.y, t: 0, flip: tx > sx });
+      tcorpse.push({
+        img: IMG["z_" + z.type],
+        h: SPRITE_H["z_" + z.type] * K,
+        x: z.x,
+        y: z.y,
+        t: 0,
+        flip: T.x > z.x - (T.y - z.y) * 0.9,
+      });
       if (z.d.big) {
         boom(fx0, fy0, 3);
         slowT = 0.7;
         flashA = 0.5;
         banner("CHEFÃO ABATIDO!");
-      } else if (Math.random() < 0.08)
-        tdrops.push({ x: z.x, y: z.y, kind: Math.random() < 0.5 ? "rep" : "cash", t: 0, life: 12, z0: 0 });
+      }
     }
   }
-  function explode(x, y, dmg, rad, k) {
+  function lootAt(x, y, chance) {
+    if (Math.random() < chance)
+      tdrops.push({ x, y, kind: Math.random() < 0.45 ? "rep" : "cash", t: 0, life: 14, z0: 0 });
+  }
+  // dano num objeto destrutível
+  function hitObj(o, dmg) {
+    if (o.dead) return;
+    o.hp -= dmg;
+    o.fl = 0.08;
+    if (o.hp > 0) return;
+    o.dead = true;
+    score += OBJ[o.type].pts;
+    const [fx0, fy0] = P(o.x, o.y, 4),
+      th = LV.theme;
+    const debris = (n, cols, sz = 1.6, sp = 90) => {
+      for (let i = 0; i < n; i++) {
+        const a = rnd(3.4, 6),
+          v = rnd(30, sp);
+        add({
+          k: "d",
+          x: fx0 + rnd(-4, 4),
+          y: fy0 + rnd(-6, 2),
+          vx: Math.cos(a) * v,
+          vy: Math.sin(a) * v,
+          rot: rnd(0, 6),
+          vr: rnd(-12, 12),
+          sz: rnd(0.6, sz),
+          col: cols[i % cols.length],
+          gy: fy0 + 4 + rnd(-3, 5),
+          life: rnd(1.2, 2.2),
+          max: 2.2,
+        });
+      }
+    };
+    switch (o.type) {
+      case "barrel":
+        // explode e machuca tudo em volta (reação em cadeia)
+        boomAt(o.x, o.y, 90, 46, 1.9, true);
+        break;
+      case "nest":
+        boom(fx0, fy0, 2.6);
+        gore(fx0, fy0 - 6, 40, true);
+        money += 80;
+        txt(fx0, fy0 - 20, "NINHO DESTRUÍDO!", "140,235,90");
+        lootAt(o.x, o.y, 1);
+        flashA = 0.3;
+        flashC = "180,255,120";
+        {
+          const left = LV.objs.filter((n) => n.nest && !n.dead).length;
+          banner(left ? `NINHO DESTRUÍDO! FALTAM ${left}` : "TODOS OS NINHOS DESTRUÍDOS! VÁ PARA A EXTRAÇÃO", 2.4);
+        }
+        break;
+      case "hut":
+      case "tower":
+      case "ruin":
+        boom(fx0, fy0 - 10, 2.2);
+        debris(40, o.type === "ruin" ? ["#7a7c78", "#5c5e5a", "#9a9c96"] : ["#7a5a3a", "#5a3f26", "#3d5224"], 2.6, 130);
+        tScorch(fx0, fy0 + 4, 14);
+        lootAt(o.x, o.y, 0.8);
+        break;
+      case "car":
+        boomAt(o.x, o.y, 60, 30, 1.5, true);
+        debris(16, ["#8a4a2a", "#3a3a3a", "#c0c4c8"]);
+        break;
+      case "tree":
+        debris(18, th.leaf, 2, 70);
+        debris(5, ["#6b4a2a", "#4e3520"]);
+        tSplat(fx0, fy0 + 3, "rgba(60,40,20,.7)");
+        break;
+      case "rock":
+        debris(18, [th.rock, "#5e605a", "#b0b2aa"], 2.2);
+        puff(fx0, fy0, 5);
+        break;
+      case "crate":
+        debris(12, ["#9a6a32", "#6b4a22", "#c89a55"]);
+        lootAt(o.x, o.y, 0.6);
+        break;
+      default:
+        debris(14, o.type === "bags" ? ["#b59a62", "#d8c189", "#86703f"] : ["#7a5a3a", "#a0a5aa"]);
+        puff(fx0, fy0, 4);
+    }
+    sfx("hit");
+  }
+  // explosão no mundo: zumbis, objetos e o próprio tanque
+  function boomAt(x, y, dmg, rad, k, hurtTank = false) {
     for (const z of tz) {
       if (z.dead) continue;
       const d = Math.hypot(z.x - x, z.y - y) - z.r;
       if (d <= rad) tHurt(z, dmg * (d <= rad * 0.4 ? 1 : 0.6));
     }
+    for (const o of LV.objs) {
+      if (o.dead) continue;
+      const d = Math.hypot(o.x - x, o.y - y) - o.r;
+      if (d <= rad) setTimeout(() => hitObj(o, dmg * (d <= rad * 0.4 ? 1 : 0.6)), 60); // atraso = reação em cadeia
+    }
+    const dt = Math.hypot(T.x - x, T.y - y);
+    if (hurtTank && dt < rad * 0.8) {
+      T.hp -= dmg * 0.25;
+      T.fl = 0.1;
+    }
     const [fx0, fy0] = P(x, y, 1);
     boom(fx0, fy0, k);
   }
-  function inField(x, y) {
-    if (x < GX - 0.2 * CELL || x > GX + 9.1 * CELL || y < -1.5 * CELL || y > 6.4 * CELL) return false;
-    const [sx, sy] = iso(x, y);
-    return sx > 50 && sx < VW - 50 && sy > 95 && sy < VH - 18;
+  function blocked(x, y, r, ignoreCrush) {
+    if (x < CELL * 0.6 || x > LV.L - CELL * 0.6 || y < CELL * 0.55 || y > LV.W - CELL * 0.55) return { wall: true };
+    for (const o of LV.objs) {
+      if (o.dead || !OBJ[o.type].block) continue;
+      if (Math.hypot(o.x - x, o.y - y) < o.r + r) {
+        if (ignoreCrush && OBJ[o.type].crush) continue;
+        return o;
+      }
+    }
+    return null;
   }
   function fireCannon(st) {
     const cn = CANNON[tcfg.cannon],
@@ -3751,11 +4113,11 @@
     });
     T.cd = st.reload;
     T.rec = 0.22;
-    T.vel -= 14 * cn.k; // coice
+    T.vel -= 14 * cn.k;
     const [fx0, fy0] = P(x, y, 9.8);
-    G(GL.y, fx0, fy0, { r0: 4 * cn.k, r1: 7 * cn.k, life: 0.09, row: 0 });
-    G(GL.w, fx0, fy0, { r0: 2.4, r1: 3, life: 0.06, row: 0 });
-    G(GL.gs, fx0, fy0, { r0: 16, r1: 20, life: 0.1, a: 0.45, row: 0 });
+    G(GL.y, fx0, fy0, { r0: 4 * cn.k, r1: 7 * cn.k, life: 0.09 });
+    G(GL.w, fx0, fy0, { r0: 2.4, r1: 3, life: 0.06 });
+    G(GL.gs, fx0, fy0, { r0: 16, r1: 20, life: 0.1, a: 0.45 });
     for (let i = 0; i < 6; i++) {
       const [a, b] = P(x + dx * rnd(2, 10), y + dy * rnd(2, 10), 9.8);
       G(GL.sl, a, b, {
@@ -3773,12 +4135,12 @@
     const [bx, by] = P(T.x - Math.cos(T.ang) * 14, T.y - Math.sin(T.ang) * 14, 1);
     puff(bx, by, 4);
     trauma = Math.min(1, trauma + 0.12 * cn.k);
+    rumble(0.6, 120);
     sfx("cannon");
   }
   function fireMG(st) {
     const R = CHASSIS[tcfg.chassis].W * 0.37,
       a = T.tur + rnd(-0.05, 0.05),
-      // a metralhadora fica no teto, deslocada para o lado da torreta
       side = T.tur - Math.PI / 2,
       ox = T.x + Math.cos(T.ang) * -2 + Math.cos(side) * R * 0.5 + Math.cos(T.tur) * 11,
       oy = T.y + Math.sin(T.ang) * -2 + Math.sin(side) * R * 0.5 + Math.sin(T.tur) * 11;
@@ -3790,20 +4152,100 @@
       txt(...P(T.x, T.y, 30), "SUPERAQUECEU!", "255,120,80");
     }
     const [fx0, fy0] = P(ox, oy, 12);
-    G(GL.y, fx0, fy0, { r0: 1.8, r1: 3, life: 0.05, row: 0 });
+    G(GL.y, fx0, fy0, { r0: 1.8, r1: 3, life: 0.05 });
     part(fx0, fy0, rnd(-20, 20), -rnd(30, 50), 0.6, "#d9a440", 1, 260);
     sfx("shot");
   }
+
+  /* ---------- controle de videogame (Gamepad API, PS4 genérico) ---------- */
+  const pad = {
+    lx: 0,
+    ly: 0,
+    rx: 0,
+    ry: 0,
+    cannon: false,
+    mg: false,
+    up: false,
+    down: false,
+    left: false,
+    right: false,
+    prev: [],
+    id: "",
+  };
+  function rumble(strength, ms) {
+    try {
+      const gp = [...(navigator.getGamepads ? navigator.getGamepads() : [])].find((g) => g && g.connected);
+      if (gp && gp.vibrationActuator)
+        gp.vibrationActuator
+          .playEffect("dual-rumble", { duration: ms, strongMagnitude: strength, weakMagnitude: strength * 0.6 })
+          .catch(() => {});
+    } catch (e) {}
+  }
+  function pollPad() {
+    let gp = null;
+    try {
+      gp = [...(navigator.getGamepads ? navigator.getGamepads() : [])].find(
+        (g) => g && g.connected && g.axes.length >= 2,
+      );
+    } catch (e) {}
+    if (!gp) {
+      pad.lx = pad.ly = pad.rx = pad.ry = 0;
+      pad.cannon = pad.mg = false;
+      return;
+    }
+    if (pad.id !== gp.id) {
+      pad.id = gp.id;
+      banner("CONTROLE CONECTADO", 1.8);
+    }
+    const dz = (v) => (Math.abs(v) < 0.18 ? 0 : v);
+    const btn = (i) => !!(gp.buttons[i] && (gp.buttons[i].pressed || gp.buttons[i].value > 0.4));
+    const std = gp.mapping === "standard";
+    pad.lx = dz(gp.axes[0] || 0);
+    pad.ly = dz(gp.axes[1] || 0);
+    // controles genéricos sem mapeamento padrão costumam usar os eixos 2 e 5 para o analógico direito
+    pad.rx = dz(gp.axes[2] || 0);
+    pad.ry = dz((std ? gp.axes[3] : gp.axes.length > 5 ? gp.axes[5] : gp.axes[3]) || 0);
+    if (std) {
+      pad.cannon = btn(7) || btn(5) || btn(0);
+      pad.mg = btn(6) || btn(4) || btn(2);
+      pad.up = btn(12);
+      pad.down = btn(13);
+      pad.left = btn(14);
+      pad.right = btn(15);
+    } else {
+      pad.cannon = btn(7) || btn(5) || btn(1);
+      pad.mg = btn(6) || btn(4) || btn(0);
+      pad.up = pad.down = pad.left = pad.right = false;
+    }
+    const pressed = gp.buttons.map((b, i) => btn(i)),
+      edge = (i) => pressed[i] && !pad.prev[i];
+    // OPTIONS/START = pausa; X confirma o botão principal das telas
+    if (edge(9)) {
+      if (MODE === "tank" && (state === "play" || state === "pause")) togglePause();
+    }
+    if ((edge(std ? 0 : 1) || edge(9)) && !ov.classList.contains("hide") && state !== "play") {
+      const b = panel.querySelector(".big:not([disabled])");
+      if (b) b.click();
+    }
+    pad.prev = pressed;
+    if (pad.lx || pad.ly || pad.rx || pad.ry || pad.cannon || pad.mg) {
+      tin.mouse = null;
+      tin.touch = false;
+    }
+  }
+  addEventListener("gamepadconnected", () => banner("CONTROLE CONECTADO", 1.8));
+
   function tUpdate(dt) {
     const st = tStats();
-    // --- movimento
-    let fwd = (tkeys.has("arrowup") ? 1 : 0) - (tkeys.has("arrowdown") ? 1 : 0),
-      rot = (tkeys.has("arrowright") ? 1 : 0) - (tkeys.has("arrowleft") ? 1 : 0);
-    if (tin.joy) {
-      // joystick: o casco gira para a direção apontada e anda para frente
-      const m = Math.min(1, Math.hypot(tin.joy.x, tin.joy.y));
+    // --- movimento: teclado, controle ou analógico da tela
+    let fwd = (tkeys.has("arrowup") || pad.up ? 1 : 0) - (tkeys.has("arrowdown") || pad.down ? 1 : 0),
+      rot = (tkeys.has("arrowright") || pad.right ? 1 : 0) - (tkeys.has("arrowleft") || pad.left ? 1 : 0);
+    const stick = tin.joy || (pad.lx || pad.ly ? { x: pad.lx, y: pad.ly } : null);
+    if (stick) {
+      // o casco gira para a direção apontada na tela e anda para frente
+      const m = Math.min(1, Math.hypot(stick.x, stick.y));
       if (m > 0.15) {
-        const want = screenToGroundDir(tin.joy.x, tin.joy.y),
+        const want = screenToGroundDir(stick.x, stick.y),
           d = angDiff(want, T.ang);
         T.ang = turnTo(T.ang, want, st.turn * 1.3 * dt);
         fwd = m * Math.max(0, Math.cos(d));
@@ -3814,12 +4256,24 @@
     T.vel += (target - T.vel) * Math.min(1, dt * 5);
     const nx = T.x + Math.cos(T.ang) * T.vel * dt,
       ny = T.y + Math.sin(T.ang) * T.vel * dt;
-    if (inField(nx, ny)) {
+    // colisão: o que é esmagável (cerca, árvore, caixa) quebra se o tanque passa por cima
+    const tryMove = (x, y) => {
+      const b = blocked(x, y, 11, false);
+      if (!b) return true;
+      if (!b.wall && OBJ[b.type].crush && Math.abs(T.vel) > 12) {
+        hitObj(b, 999);
+        T.vel *= 0.7;
+        trauma = Math.min(1, trauma + 0.08);
+        return true;
+      }
+      return false;
+    };
+    if (tryMove(nx, ny)) {
       T.x = nx;
       T.y = ny;
-    } else if (inField(nx, T.y)) T.x = nx;
-    else if (inField(T.x, ny)) T.y = ny;
-    else T.vel = 0;
+    } else if (tryMove(nx, T.y)) T.x = nx;
+    else if (tryMove(T.x, ny)) T.y = ny;
+    else T.vel *= 0.3;
     T.phase += T.vel * dt * 0.8 + Math.abs(rot) * dt * 10;
     if (Math.abs(T.vel) > 15 && Math.random() < 0.25) {
       const [bx, by] = P(T.x - Math.cos(T.ang) * 15, T.y - Math.sin(T.ang) * 15, 0);
@@ -3830,74 +4284,50 @@
       engine.g.gain.setTargetAtTime(sound ? 0.05 + 0.1 * f : 0, AC.currentTime, 0.08);
       engine.o.frequency.setTargetAtTime(36 + 34 * f, AC.currentTime, 0.1);
     }
-    // --- torreta: A/D, mouse ou mira automática (celular)
-    const tr = (tkeys.has("d") ? 1 : 0) - (tkeys.has("a") ? 1 : 0);
+    // --- torreta: A/D, analógico direito (tela ou controle) ou mouse
+    const tr = (tkeys.has("d") ? 1 : 0) - (tkeys.has("a") ? 1 : 0),
+      aim = tin.joy2 || (Math.hypot(pad.rx, pad.ry) > 0.3 ? { x: pad.rx, y: pad.ry } : null);
     if (tr) T.tur += tr * 2.8 * dt;
+    else if (aim && Math.hypot(aim.x, aim.y) > 0.25) T.tur = turnTo(T.tur, screenToGroundDir(aim.x, aim.y), 5 * dt);
     else if (tin.mouse) T.tur = turnTo(T.tur, Math.atan2(tin.mouse.y - T.y, tin.mouse.x - T.x), 4 * dt);
-    else if (tin.touch) {
-      let best = null,
-        bd = 330;
-      for (const z of tz) {
-        if (z.dead) continue;
-        const d = Math.hypot(z.x - T.x, z.y - T.y);
-        if (d < bd) {
-          bd = d;
-          best = z;
-        }
-      }
-      if (best) T.tur = turnTo(T.tur, Math.atan2(best.y - T.y, best.x - T.x), 3.2 * dt);
-    }
     // --- armas
     T.cd -= dt;
     T.mgCd -= dt;
     T.rec = Math.max(0, T.rec - dt);
     T.fl = Math.max(0, T.fl - dt);
-    const wantCannon = tin.cannon || tkeys.has(" ") || tkeys.has("b"),
-      wantMG = tin.mg || tkeys.has("enter");
+    const wantCannon = tin.cannon || pad.cannon || tkeys.has(" ") || tkeys.has("b"),
+      wantMG = tin.mg || pad.mg || tkeys.has("enter");
     if (wantCannon && T.cd <= 0) fireCannon(st);
     if (wantMG && !T.over && T.mgCd <= 0) fireMG(st);
     T.heat = Math.max(0, T.heat - dt * (wantMG && !T.over ? 0.05 : 0.38));
     if (T.over && T.heat < 0.3) T.over = false;
-    // --- ondas
-    if (waveState === "prep") {
-      timer -= dt;
-      if (timer <= 0) {
-        wave++;
-        queue = buildWave(wave);
-        spawnT = 1;
-        waveState = "fight";
-        banner(wave === MAX_WAVE ? `ONDA ${wave} · CHEFÃO!` : `ONDA ${wave} / ${MAX_WAVE}`);
-        sfx("wave");
+    // --- zumbis que acordam quando o tanque chega perto
+    for (const s of LV.sleepers)
+      if (!s.woke && Math.hypot(s.x - T.x, s.y - T.y) < (s.type === "boss" ? 260 : 300)) {
+        s.woke = true;
+        tSpawn(s.type, s.x, s.y);
       }
-    } else {
-      spawnT -= dt;
-      if (spawnT <= 0 && queue.length) {
-        tSpawn(queue.shift());
-        spawnT = Math.max(0.7, 2.6 - wave * 0.17) * rnd(0.6, 1.4);
-      }
-      if (!queue.length && !tz.some((z) => !z.dead)) {
-        score += wave * 500;
-        const b = 40 + wave * 10;
-        money += b;
-        if (wave >= MAX_WAVE) return tEnd(true);
-        engineOff();
-        banner(`ONDA LIMPA! +$${b}`);
-        sfx("coin");
-        setTimeout(() => state === "play" && MODE === "tank" && showShop(), 900);
-        waveState = "done";
+    // --- ninhos soltam zumbis enquanto o tanque está por perto
+    const alive = tz.filter((z) => !z.dead).length;
+    for (const o of LV.objs) {
+      if (!o.nest || o.dead) continue;
+      o.fl = Math.max(0, o.fl - dt);
+      if (Math.hypot(o.x - T.x, o.y - T.y) > 430) continue;
+      o.spawnT -= dt;
+      if (o.spawnT <= 0 && alive < 14) {
+        o.spawnT = Math.max(2.2, 4.5 - camp.m * 0.45) * rnd(0.7, 1.3);
+        const a = rnd(0, 6.28);
+        tSpawn(
+          LV.M.zs[(Math.random() * LV.M.zs.length) | 0],
+          o.x + Math.cos(a) * (o.r + 8),
+          o.y + Math.sin(a) * (o.r + 8),
+        );
+        const [fx0, fy0] = P(o.x, o.y, 6);
+        G(GL.g, fx0, fy0, { r0: 6, r1: 18, life: 0.4, a: 0.6 });
       }
     }
-    // caixas de suprimento lançadas de paraquedas
-    airT -= dt;
-    if (airT <= 0) {
-      airT = rnd(14, 20);
-      let x, y;
-      do {
-        x = GX + rnd(0.5, 8.5) * CELL;
-        y = rnd(-0.5, 5.5) * CELL;
-      } while (!inField(x, y));
-      tdrops.push({ x, y, kind: Math.random() < 0.5 ? "rep" : "cash", t: 0, life: 14, z0: 70 });
-    }
+    for (const o of LV.objs) if (!o.nest) o.fl = Math.max(0, o.fl - dt);
+    // caixas lançadas de paraquedas perto do tanque
     // --- zumbis
     for (const z of tz) {
       if (z.dead) continue;
@@ -3909,9 +4339,8 @@
         dy = T.y - z.y,
         dist = Math.hypot(dx, dy),
         reach = z.r + 13;
-      let move = true;
+      let move = dist < 520;
       if (d.gun) {
-        // chefão: rajadas de metralhadora no tanque
         z.gun -= dt;
         if (z.burst > 0) {
           z.bt -= dt;
@@ -3932,11 +4361,11 @@
               dmg: d.gun,
             });
             const [fx0, fy0] = P(z.x + Math.cos(a) * 18, z.y + Math.sin(a) * 18, 20);
-            G(GL.y, fx0, fy0, { r0: 3, r1: 5, life: 0.07, row: 0 });
+            G(GL.y, fx0, fy0, { r0: 3, r1: 5, life: 0.07 });
             trauma = Math.min(1, trauma + 0.05);
             sfx("shot");
           }
-        } else if (z.gun <= 0 && dist < 200) {
+        } else if (z.gun <= 0 && dist < 220) {
           z.gun = 2.6;
           z.burst = 6;
         }
@@ -3965,16 +4394,26 @@
         T.hp -= d.dps * dt;
         T.fl = 0.06;
         move = false;
-        // atropelar: o tanque andando para cima do zumbi machuca
-        if (Math.abs(T.vel) > 20) tHurt(z, 70 * dt * (Math.abs(T.vel) / st.speed), true);
+        if (Math.abs(T.vel) > 20) tHurt(z, 70 * dt * (Math.abs(T.vel) / st.speed), true); // atropelar
       } else z.bite = false;
       if (move) {
         const sp = d.sp * 2.2;
         z.x += (dx / dist) * sp * dt;
         z.y += (dy / dist) * sp * dt;
       }
+      // contorna objetos
+      for (const o of LV.objs) {
+        if (o.dead || !OBJ[o.type].block) continue;
+        const ox = z.x - o.x,
+          oy = z.y - o.y,
+          od = Math.hypot(ox, oy) || 0.01,
+          m = o.r + z.r - od;
+        if (m > 0) {
+          z.x += (ox / od) * m + (-oy / od) * m * 0.5;
+          z.y += (oy / od) * m + (ox / od) * m * 0.5;
+        }
+      }
     }
-    // separação entre zumbis e para fora do tanque
     for (let i = 0; i < tz.length; i++) {
       const a = tz[i];
       if (a.dead) continue;
@@ -4008,19 +4447,27 @@
       p.y += p.vy * dt;
       if (p.k === "shell" && Math.random() < 0.7) {
         const [a, b] = P(p.x, p.y, p.h);
-        G(GL.sl, a, b, { add: false, a: 0.22, smoke: 1, r0: 0.8, r1: 2.6, life: 0.45, row: 0 });
+        G(GL.sl, a, b, { add: false, a: 0.22, smoke: 1, r0: 0.8, r1: 2.6, life: 0.45 });
       }
-      let hit = null;
+      let hit = null,
+        hitO = null;
       for (const z of tz)
         if (!z.dead && Math.hypot(z.x - p.x, z.y - p.y) < z.r + 2) {
           hit = z;
           break;
         }
-      if (hit) {
+      if (!hit)
+        for (const o of LV.objs)
+          if (!o.dead && Math.hypot(o.x - p.x, o.y - p.y) < o.r + 1) {
+            hitO = o;
+            break;
+          }
+      if (hit || hitO) {
         p.dead = true;
-        if (p.k === "shell") explode(p.x, p.y, p.dmg, p.splash, p.bk);
+        if (p.k === "shell") boomAt(p.x, p.y, p.dmg, p.splash, p.bk);
         else {
-          tHurt(hit, p.dmg);
+          if (hit) tHurt(hit, p.dmg);
+          else hitObj(hitO, p.dmg);
           const [a, b] = P(p.x, p.y, 10);
           for (let i = 0; i < 3; i++)
             add({
@@ -4033,12 +4480,11 @@
               max: 0.12,
               g: 200,
               col: "255,240,180",
-              row: 0,
             });
         }
       } else if (p.life <= 0) {
         p.dead = true;
-        if (p.k === "shell") explode(p.x, p.y, p.dmg, p.splash, p.bk);
+        if (p.k === "shell") boomAt(p.x, p.y, p.dmg, p.splash, p.bk);
       }
     }
     // --- projéteis dos zumbis
@@ -4050,9 +4496,10 @@
         p.dead = true;
         T.hp -= p.dmg;
         T.fl = 0.1;
+        rumble(0.3, 80);
         const [a, b] = P(p.x, p.y, 8);
         if (p.k === "acid") {
-          G(GL.g, a, b, { r0: 3, r1: 10, life: 0.25, a: 0.7, row: 0 });
+          G(GL.g, a, b, { r0: 3, r1: 10, life: 0.25, a: 0.7 });
           for (let i = 0; i < 6; i++) part(a, b, rnd(-30, 30), -rnd(10, 40), 0.6, "#9be22d", 1, 120);
         } else
           for (let i = 0; i < 3; i++)
@@ -4066,28 +4513,24 @@
               max: 0.12,
               g: 200,
               col: "255,240,180",
-              row: 0,
             });
-      } else if (p.life <= 0) p.dead = true;
+      } else if (p.life <= 0 || blocked(p.x, p.y, 1, true)) p.dead = true;
     }
-    // --- caixas
+    // --- caixas de reparo / moedas
     for (const c of tdrops) {
       c.t += dt;
       c.life -= dt;
-      if (c.z0 > 0) {
-        c.z0 = Math.max(0, c.z0 - 30 * dt);
-        if (c.z0 === 0) puff(...P(c.x, c.y, 0), 5);
-      } else if (Math.hypot(c.x - T.x, c.y - T.y) < 18) {
+      if (Math.hypot(c.x - T.x, c.y - T.y) < 18) {
         c.life = 0;
         const [a, b] = P(c.x, c.y, 6);
-        G(GL.y, a, b, { r0: 4, r1: 16, life: 0.3, row: 0 });
+        G(GL.y, a, b, { r0: 4, r1: 16, life: 0.3 });
         if (c.kind === "rep") {
-          T.hp = Math.min(st.max, T.hp + st.max * 0.15);
-          txt(a, b - 8, "REPARO +15%", "140,235,90");
+          T.hp = Math.min(st.max, T.hp + st.max * 0.2);
+          txt(a, b - 8, "REPARO +20%", "140,235,90");
         } else {
-          money += 25;
+          money += 30;
           coins(a, b);
-          txt(a, b - 8, "+$25", "255,214,90");
+          txt(a, b - 8, "+$30", "255,214,90");
         }
         sfx("coin");
       }
@@ -4096,8 +4539,25 @@
     tp = tp.filter((p) => !p.dead);
     zp = zp.filter((p) => !p.dead);
     tdrops = tdrops.filter((c) => c.life > 0);
+    LV.objs = LV.objs.filter((o) => !o.dead);
     for (const c of tcorpse) c.t += dt;
     tcorpse = tcorpse.filter((c) => c.t < 2.6);
+    // --- objetivo: ninhos (e chefão) destruídos + chegar à extração
+    const nestsLeft = LV.objs.filter((o) => o.nest).length,
+      bossLeft = LV.M.boss && (tz.some((z) => z.d.big) || LV.sleepers.some((s) => s.type === "boss" && !s.woke));
+    LV.done = !nestsLeft && !bossLeft;
+    if (Math.hypot(T.x - LV.ex.x, T.y - LV.ex.y) < 34) {
+      if (LV.done) return tEnd(true);
+      if (!LV.warned) {
+        LV.warned = true;
+        banner(nestsLeft ? `DESTRUA OS NINHOS: FALTAM ${nestsLeft}` : "DERROTE O CHEFÃO!", 2.4);
+        setTimeout(() => LV && (LV.warned = false), 4000);
+      }
+    }
+    // --- câmera segue o tanque, olhando um pouco para a frente
+    const [sx, sy] = wiso(T.x + Math.cos(T.tur) * 40, T.y + Math.sin(T.tur) * 40);
+    cam.x += (sx - VIEW.w * 0.5 - cam.x) * Math.min(1, dt * 3);
+    cam.y += (sy - VIEW.h * 0.55 - cam.y) * Math.min(1, dt * 3);
     if (T.hp <= 0) {
       T.hp = 0;
       const [a, b] = P(T.x, T.y, 6);
@@ -4106,37 +4566,356 @@
       slowT = 0.8;
       flashA = 0.6;
       flashC = "255,120,60";
+      rumble(1, 600);
       tEnd(false);
     }
   }
 
+  /* ---------- desenho dos objetos (pseudo-3D em camadas) ---------- */
+  function layerFn(M, x, y, ang) {
+    return (h) => {
+      ctx.setTransform(M[0], M[1], M[2], M[3], M[4], M[5] - h * FS * K);
+      ctx.translate(x, y);
+      if (ang) ctx.rotate(ang);
+    };
+  }
+  function box(lay, w, d, h, side, top, ox = 0, oy = 0, h0 = 0) {
+    const step = w < 3 || d < 3 ? 0.25 : Math.min(0.7, Math.max(0.35, h / 10)); // peças finas precisam de mais camadas
+    for (let k = h0; k < h0 + h; k += step) {
+      lay(k);
+      ctx.fillStyle = side;
+      ctx.fillRect(ox - w / 2, oy - d / 2, w, d);
+    }
+    lay(h0 + h);
+    ctx.fillStyle = top;
+    ctx.fillRect(ox - w / 2, oy - d / 2, w, d);
+  }
+  function cyl(lay, r, h, side, top, h0 = 0) {
+    const step = Math.max(0.6, h / 10);
+    for (let k = h0; k < h0 + h; k += step) {
+      lay(k);
+      ctx.fillStyle = side;
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, 7);
+      ctx.fill();
+    }
+    lay(h0 + h);
+    ctx.fillStyle = top;
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, 7);
+    ctx.fill();
+  }
+  function groundShadow(lay, rx, ry) {
+    lay(0);
+    ctx.fillStyle = "rgba(0,0,0,.28)";
+    ctx.beginPath();
+    ctx.ellipse(2, 2, rx, ry, 0, 0, 7);
+    ctx.fill();
+  }
+  function drawTree(M, x, y, s, seed, th, fl) {
+    const lay = layerFn(M, x, y, 0);
+    groundShadow(lay, 8 * s, 7 * s);
+    cyl(lay, 1.6 * s, 9 * s, "#3d2712", "#5a3f26");
+    const L = th.leaf;
+    for (let k = 0; k < 4; k++) {
+      const h0 = (7 + k * 4.2) * s,
+        r = (8.5 - k * 1.9) * s * (0.9 + seed * 0.25);
+      for (let q = 0; q < 3; q++) {
+        lay(h0 + q * 1.2 * s);
+        ctx.fillStyle = q < 2 ? L[0] : L[1 + (((k + seed * 3) | 0) % 2)];
+        ctx.beginPath();
+        ctx.arc(0, 0, r, 0, 7);
+        ctx.fill();
+      }
+      lay(h0 + 3.6 * s);
+      ctx.fillStyle = L[2];
+      ctx.beginPath();
+      ctx.arc(-r * 0.3, -r * 0.3, r * 0.45, 0, 7);
+      ctx.fill();
+    }
+    if (fl > 0) {
+      lay(20 * s);
+      ctx.fillStyle = "rgba(255,255,255,.35)";
+      ctx.beginPath();
+      ctx.arc(0, 0, 6 * s, 0, 7);
+      ctx.fill();
+    }
+  }
+  function drawObj(o, M, th) {
+    const lay = layerFn(M, o.x, o.y, o.ang),
+      fl = o.fl > 0;
+    switch (o.type) {
+      case "tree":
+        return drawTree(M, o.x, o.y, 1 + o.seed * 0.4, o.seed, th, o.fl);
+      case "barrel":
+        groundShadow(lay, 5, 5);
+        cyl(lay, 3.6, 9, fl ? "#fff" : "#7a1c14", "#c0392b");
+        lay(4);
+        ctx.fillStyle = "#f2c230";
+        ctx.beginPath();
+        ctx.arc(0, 0, 3.7, 0, 7);
+        ctx.fill();
+        cyl(lay, 3.6, 3.5, "#7a1c14", "#d24a3a", 5);
+        lay(8.6);
+        ctx.fillStyle = "#3a0d08";
+        ctx.beginPath();
+        ctx.arc(1.2, -0.8, 0.9, 0, 7);
+        ctx.fill();
+        return;
+      case "crate":
+        groundShadow(lay, 6, 6);
+        box(lay, 9, 9, 8, fl ? "#fff" : "#5a3d1c", "#9a6a32");
+        lay(8);
+        ctx.fillStyle = "#6b4a22";
+        ctx.fillRect(-4.5, -0.6, 9, 1.2);
+        ctx.fillRect(-0.6, -4.5, 1.2, 9);
+        return;
+      case "bags":
+        groundShadow(lay, 12, 5);
+        for (let r = 0; r < 3; r++) {
+          box(lay, 22 - r * 3, 6.5 - r, 2.6, fl ? "#fff" : "#86703f", r % 2 ? "#d8c189" : "#c8ad74", 0, 0, r * 2.6);
+          lay(r * 2.6 + 2.6);
+          ctx.fillStyle = "rgba(0,0,0,.25)";
+          for (let k = -9 + r; k < 10 - r; k += 4) ctx.fillRect(k, -3, 0.5, 6);
+        }
+        return;
+      case "fence":
+        for (const px of [-11, 0, 11]) box(lay, 1.6, 1.6, 9, "#3d2712", "#6b4a2a", px, 0);
+        for (const h of [3, 6]) {
+          box(lay, 24, 0.7, 0.8, "#6b6e72", "#b0b4b8", 0, 0, h);
+          lay(h + 0.8);
+          ctx.fillStyle = "#d0d4d8";
+          for (let k = -10; k < 11; k += 3) ctx.fillRect(k, -1, 0.6, 2);
+        }
+        return;
+      case "rock": {
+        groundShadow(lay, 8, 7);
+        const pts = 7;
+        for (let h = 0; h <= 6; h += 0.8) {
+          lay(h);
+          ctx.fillStyle = h < 6 ? "#4e504a" : th.rock;
+          const sh = 1 - (h / 6) * 0.35;
+          ctx.beginPath();
+          for (let i = 0; i < pts; i++) {
+            const a = (i / pts) * 6.283,
+              r = (6 + hash(o.seed * 9, i) * 2.5) * sh;
+            ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+          }
+          ctx.fill();
+        }
+        return;
+      }
+      case "hut":
+        groundShadow(lay, 18, 14);
+        box(lay, 28, 22, 16, fl ? "#fff" : "#4e3520", "#7a5a3a");
+        box(lay, 30, 24, 3, "#2a3d1a", "#3d5224", 0, 0, 16);
+        box(lay, 26, 14, 3, "#2a3d1a", "#4b6a2c", 0, 0, 19);
+        box(lay, 20, 6, 2, "#2a3d1a", "#5b7a35", 0, 0, 22);
+        return;
+      case "tower":
+        groundShadow(lay, 10, 10);
+        for (const [px, py] of [
+          [-6, -6],
+          [6, -6],
+          [-6, 6],
+          [6, 6],
+        ])
+          box(lay, 1.6, 1.6, 26, "#3d2712", "#6b4a2a", px, py);
+        box(lay, 16, 16, 7, fl ? "#fff" : "#5a3f26", "#7a5a3a", 0, 0, 24);
+        box(lay, 18, 18, 2, "#2a3d1a", "#3d5224", 0, 0, 33);
+        return;
+      case "ruin":
+        groundShadow(lay, 22, 18);
+        for (let h = 0; h < 34; h += 1.2) {
+          lay(h);
+          ctx.fillStyle = fl ? "#fff" : ((h / 7) | 0) % 2 ? "#5c5e5a" : "#6c6e6a";
+          ctx.fillRect(-17, -13, 34, 26);
+        }
+        lay(34);
+        ctx.fillStyle = "#8a8c88";
+        ctx.fillRect(-17, -13, 34, 26);
+        ctx.fillStyle = "#4a4c48";
+        ctx.fillRect(-12, -8, 10, 7);
+        ctx.fillRect(3, 2, 11, 8);
+        ctx.fillStyle = "#3a3c38";
+        ctx.beginPath();
+        ctx.moveTo(17, -13);
+        ctx.lineTo(4, -13);
+        ctx.lineTo(17, 0);
+        ctx.fill();
+        return;
+      case "car":
+        groundShadow(lay, 11, 7);
+        box(lay, 20, 10, 4, fl ? "#fff" : "#4a2a18", "#8a4a2a", 0, 0, 1.5);
+        box(lay, 9, 9, 4, "#3a2014", "#6a3a22", -2, 0, 5.5);
+        lay(1);
+        ctx.fillStyle = "#111";
+        for (const [px, py] of [
+          [-6, -5],
+          [6, -5],
+          [-6, 5],
+          [6, 5],
+        ])
+          ctx.fillRect(px - 2, py - 1, 4, 2);
+        return;
+      case "nest": {
+        groundShadow(lay, 18, 15);
+        const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 300 + o.seed * 6);
+        for (let h = 0; h <= 12; h += 0.8) {
+          lay(h);
+          const r = 15 * (1 - (h / 12) ** 1.6) + 3;
+          ctx.fillStyle = fl ? "#fff" : h < 12 ? (h % 2.4 < 1.2 ? "#2c3a17" : "#3b2a3a") : "#5a7a2a";
+          ctx.beginPath();
+          ctx.ellipse(0, 0, r, r * 0.92, 0, 0, 7);
+          ctx.fill();
+        }
+        lay(12);
+        ctx.globalCompositeOperation = "lighter";
+        ctx.drawImage(GL.g, -8, -8, 16, 16);
+        ctx.globalAlpha = 0.4 + pulse * 0.5;
+        ctx.drawImage(GL.g, -14, -14, 28, 28);
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = "source-over";
+        lay(2);
+        ctx.fillStyle = "#e8e4d0";
+        for (let i = 0; i < 6; i++) {
+          const a = i + o.seed * 5;
+          ctx.fillRect(Math.cos(a) * 15, Math.sin(a) * 13, 3, 1);
+        }
+        return;
+      }
+    }
+  }
+  function drawFlag(M, ex, done) {
+    const lay = layerFn(M, ex.x, ex.y, 0);
+    lay(0);
+    ctx.fillStyle = done ? "rgba(140,235,90,.35)" : "rgba(242,194,48,.22)";
+    ctx.beginPath();
+    ctx.arc(0, 0, 34, 0, 7);
+    ctx.fill();
+    ctx.strokeStyle = done ? "#8be04f" : "#f2c230";
+    ctx.lineWidth = 1.2;
+    ctx.setLineDash([4, 3]);
+    ctx.beginPath();
+    ctx.arc(0, 0, 34, 0, 7);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    cyl(lay, 1, 40, "#555", "#aaa");
+    // bandeira em pé, na tela
+    const [sx, sy] = wiso(ex.x, ex.y);
+    ctx.setTransform(FS, 0, 0, FS, -cam.x * FS, -cam.y * FS);
+    const t = performance.now() / 200,
+      top = sy - 40 * K;
+    ctx.fillStyle = done ? "#8be04f" : "#f2c230";
+    ctx.beginPath();
+    ctx.moveTo(sx, top);
+    for (let i = 0; i <= 6; i++) ctx.lineTo(sx + i * 9, top + Math.sin(t + i) * 3);
+    for (let i = 6; i >= 0; i--) ctx.lineTo(sx + i * 9, top + 26 + Math.sin(t + i) * 3);
+    ctx.fill();
+    ctx.fillStyle = "#141a0e";
+    ctx.font = "bold 11px 'Press Start 2P',monospace";
+    ctx.fillText("EXTRAÇÃO", sx - 34, top - 10);
+  }
+
   /* ---------- desenho do modo tanque ---------- */
   function tRender() {
+    const VWt = VIEW.w,
+      VHt = VIEW.h,
+      th = LV.theme;
     ctx.save();
-    screenT();
-    ctx.imageSmoothingEnabled = true;
-    ctx.fillStyle = "#0b0f07";
-    ctx.fillRect(0, 0, VW, VH);
-    if (MAPIMG) ctx.drawImage(MAPIMG, -CAM.x, -CAM.y, 1310, 830);
-    ctx.drawImage(tdecal, 0, 0, VW, VH);
+    ctx.setTransform(FS, 0, 0, FS, 0, 0);
+    ctx.fillStyle = th.edge;
+    ctx.fillRect(0, 0, VWt, VHt);
     const M = groundM();
-    // linha de mira pontilhada no chão (PC)
-    if (T && !tin.touch && state === "play") {
+    // --- chão: só as casas visíveis
+    const cs = [
+      wunproject(cam.x, cam.y),
+      wunproject(cam.x + VWt, cam.y),
+      wunproject(cam.x, cam.y + VHt),
+      wunproject(cam.x + VWt, cam.y + VHt),
+    ];
+    const u0 = Math.floor(Math.min(...cs.map((p) => p.x)) / CELL) - 1,
+      u1 = Math.ceil(Math.max(...cs.map((p) => p.x)) / CELL) + 1,
+      v0 = Math.floor(Math.min(...cs.map((p) => p.y)) / CELL) - 1,
+      v1 = Math.ceil(Math.max(...cs.map((p) => p.y)) / CELL) + 1,
+      Lc = LV.L / CELL,
+      Wc = W_CELLS;
+    ctx.setTransform(M[0], M[1], M[2], M[3], M[4], M[5]);
+    for (let u = Math.max(u0, -8); u <= Math.min(u1, Lc + 8); u++)
+      for (let v = Math.max(v0, -6); v <= Math.min(v1, Wc + 6); v++) {
+        const out = u < 0 || u >= Lc || v < 0 || v >= Wc,
+          cx = (u + 0.5) * CELL,
+          ry = roadY(cx),
+          onRoad = !out && Math.abs((v + 0.5) * CELL - ry) < CELL * 1.1,
+          hv = hash(u, v);
+        ctx.fillStyle = out ? th.edge : onRoad ? ((u + v) % 2 ? th.road : th.road2) : th.g[(u + v) & 1];
+        ctx.fillRect(u * CELL, v * CELL, CELL + 0.6, CELL + 0.6);
+        if (!out) {
+          ctx.fillStyle = onRoad ? "rgba(0,0,0,.12)" : th.tuft;
+          for (let k = 0; k < 4; k++) {
+            const px = u * CELL + hash(u + k, v) * 21 + 1,
+              py = v * CELL + hash(u, v + k) * 21 + 1;
+            ctx.fillRect(px, py, onRoad ? 2.5 : 1.2, onRoad ? 1.2 : 2.5);
+          }
+          if (hv > 0.93 && !onRoad) {
+            ctx.fillStyle = "#e8d36a";
+            ctx.fillRect(u * CELL + 8, v * CELL + 9, 1.6, 1.6);
+          }
+        }
+      }
+    // borda do mapa
+    ctx.strokeStyle = "rgba(0,0,0,.35)";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(0, 0, LV.L, LV.W);
+    // manchas (crateras, sangue, entulho)
+    ctx.setTransform(FS * K, 0, 0, FS * K, -cam.x * FS, -cam.y * FS);
+    for (const d of tdec) {
+      if (d.k === "s")
+        for (let i = 0; i < 3; i++) {
+          ctx.fillStyle = `rgba(22,16,8,${0.18 + i * 0.1})`;
+          ctx.beginPath();
+          ctx.ellipse(d.x, d.y, d.r * (1 - i * 0.3), d.r * 0.5 * (1 - i * 0.3), 0, 0, 7);
+          ctx.fill();
+        }
+      else {
+        ctx.fillStyle = d.c;
+        ctx.fillRect(d.x, d.y, 1.4, 0.9);
+      }
+    }
+    drawFlag(M, LV.ex, LV.done);
+    // linha de mira pontilhada (PC)
+    if (!tin.touch && state === "play") {
       ctx.setTransform(M[0], M[1], M[2], M[3], M[4], M[5]);
       ctx.translate(T.x, T.y);
       ctx.rotate(T.tur);
       ctx.fillStyle = "rgba(255,240,180,.35)";
-      for (let i = 30; i < 150; i += 8) ctx.fillRect(i, -0.5, 3, 1);
-      screenT();
+      for (let i = 30; i < 160; i += 8) ctx.fillRect(i, -0.5, 3, 1);
     }
+    // --- tudo o que fica em pé, ordenado pela profundidade
+    const vis = (x, y, m = 120) => {
+      const [sx, sy] = wiso(x, y);
+      return sx > cam.x - m && sx < cam.x + VWt + m && sy > cam.y - m && sy < cam.y + VHt + m * 2;
+    };
     const list = [];
-    const push = (x, y, f, b = 0) => list.push({ d: iso(x, y)[1] + b, f });
+    const push = (x, y, f, b = 0) => vis(x, y) && list.push({ d: wiso(x, y)[1] + b, f });
+    const scr = () => ctx.setTransform(FS, 0, 0, FS, -cam.x * FS, -cam.y * FS);
+    for (const d of LV.decor) push(d.x, d.y, () => drawTree(M, d.x, d.y, d.s * 1.3, d.seed, th, 0));
+    for (const o of LV.objs)
+      push(o.x, o.y, () => {
+        drawObj(o, M, th);
+        if (o.hp < o.max && (o.nest || o.max >= 80)) {
+          scr();
+          const [sx, sy] = wiso(o.x, o.y);
+          bar(sx, sy - (o.nest ? 22 : o.type === "ruin" ? 40 : 26) * K, o.hp, o.max);
+        }
+      });
     for (const c of tcorpse)
       push(
         c.x,
         c.y,
         () => {
-          const [sx, sy] = iso(c.x, c.y),
+          scr();
+          const [sx, sy] = wiso(c.x, c.y),
             f = Math.min(1, c.t / 0.35);
           if (!c.img) return;
           ctx.save();
@@ -4153,27 +4932,19 @@
     for (const c of tdrops)
       push(c.x, c.y, () => {
         if (c.life < 3 && ((c.life * 8) | 0) % 2) return;
-        const [sx, sy0] = iso(c.x, c.y),
-          sy = sy0 - c.z0 * K;
-        if (c.z0 === 0) shadow(sx, sy0, 6 * K);
+        scr();
+        const [sx, sy] = wiso(c.x, c.y);
+        shadow(sx, sy, 6 * K);
         ctx.save();
-        at(sx, sy);
-        if (c.z0 > 0) {
-          ctx.fillStyle = "#141a0e";
-          ctx.fillRect(-7, -15, 15, 5);
-          ctx.fillStyle = "#e9e4cc";
-          ctx.fillRect(-6, -14, 13, 3);
-          ctx.fillStyle = "#141a0e";
-          ctx.fillRect(-6, -11, 1, 6);
-          ctx.fillRect(6, -11, 1, 6);
-        }
+        ctx.translate(sx, sy - Math.abs(Math.sin(c.t * 3)) * 3 * K);
+        ctx.scale(K, K);
         ctx.fillStyle = "#141a0e";
-        ctx.fillRect(-5, -5, 11, 9);
+        ctx.fillRect(-5, -9, 11, 9);
         ctx.fillStyle = c.kind === "rep" ? "#d8dcd2" : "#9a6a32";
-        ctx.fillRect(-4, -4, 9, 7);
+        ctx.fillRect(-4, -8, 9, 7);
         ctx.fillStyle = c.kind === "rep" ? "#c0392b" : "#f2c230";
-        ctx.fillRect(0, -4, 1, 7);
-        ctx.fillRect(-4, -1, 9, 1);
+        ctx.fillRect(0, -8, 1, 7);
+        ctx.fillRect(-4, -5, 9, 1);
         ctx.restore();
       });
     for (const z of tz)
@@ -4181,11 +4952,11 @@
         z.x,
         z.y,
         () => {
-          const [sx, sy0] = iso(z.x, z.y),
+          scr();
+          const [sx, sy0] = wiso(z.x, z.y),
             sy = sy0 + (z.d.big ? 2 * K : 0),
             im = IMG["z_" + z.type],
-            [tx] = iso(T.x, T.y),
-            flip = tx > sx;
+            flip = wiso(T.x, T.y)[0] > sx;
           shadow(sx, sy, (z.r + 2) * K * 0.9);
           if (!im) return;
           const h = SPRITE_H["z_" + z.type] * K;
@@ -4203,21 +4974,18 @@
         },
         0.5,
       );
-    if (T)
-      push(T.x, T.y, () => {
-        drawTank(ctx, M, FS * K, T, tcfg, T.fl);
-        screenT();
-        const [sx, sy] = iso(T.x, T.y);
-        bar(sx, sy - 24 * K, Math.max(1, T.hp), T.hp < tStats().max ? tStats().max : T.hp + 1);
-      });
+    push(T.x, T.y, () => {
+      drawTank(ctx, M, FS * K, T, tcfg, T.fl);
+    });
     list.sort((a, b) => a.d - b.d);
     for (const it of list) it.f();
     // projéteis com brilho
+    scr();
     ctx.globalCompositeOperation = "lighter";
     for (const p of [...tp, ...zp]) {
-      const [sx, sy0] = iso(p.x, p.y),
+      const [sx, sy0] = wiso(p.x, p.y),
         sy = sy0 - p.h * K,
-        [ex, ey0] = iso(p.x - p.vx * 0.03, p.y - p.vy * 0.03),
+        [ex, ey0] = wiso(p.x - p.vx * 0.03, p.y - p.vy * 0.03),
         ey = ey0 - p.h * K;
       if (p.k === "acid") {
         ctx.drawImage(GL.g, sx - 5 * K, sy - 5 * K, 10 * K, 10 * K);
@@ -4234,64 +5002,74 @@
     }
     ctx.globalCompositeOperation = "source-over";
     // partículas em pixel
-    ctx.setTransform(FS * K, 0, 0, FS * K, 0, 0);
+    ctx.setTransform(FS * K, 0, 0, FS * K, -cam.x * FS, -cam.y * FS);
     for (const p of parts) {
       ctx.globalAlpha = Math.min(1, (p.life / p.max) * 1.6);
       ctx.fillStyle = p.col;
       ctx.fillRect(p.x, p.y, p.s, p.s);
     }
     ctx.globalAlpha = 1;
-    screenT();
-    // painel de armas (canhão e calor da metralhadora)
-    if (T) {
-      const st = tStats(),
-        x0 = 18,
-        y0 = VH - 62,
-        w = 170;
-      ctx.fillStyle = "rgba(13,18,8,.8)";
-      ctx.fillRect(x0 - 8, y0 - 8, w + 16, 58);
-      ctx.font = "11px 'Press Start 2P',monospace";
-      ctx.fillStyle = "#e6eed2";
-      ctx.fillText("CANHÃO", x0, y0 + 9);
-      ctx.fillText(T.over ? "SUPERAQUECIDA" : "METRALHADORA", x0, y0 + 35);
-      const f = 1 - Math.max(0, T.cd) / st.reload;
-      ctx.fillStyle = "#000";
-      ctx.fillRect(x0, y0 + 13, w, 7);
-      ctx.fillRect(x0, y0 + 39, w, 7);
-      ctx.fillStyle = f >= 1 ? "#8be04f" : "#f2c230";
-      ctx.fillRect(x0, y0 + 13, w * Math.min(1, f), 7);
-      ctx.fillStyle = T.over ? "#ff5a2a" : T.heat > 0.7 ? "#ff9a3a" : "#e6eed2";
-      ctx.fillRect(x0, y0 + 39, w * T.heat, 7);
-    }
-    if (waveState === "prep" && state === "play") {
-      const f = 1 - timer / 4,
-        w = VW * 0.4;
-      ctx.fillStyle = "rgba(0,0,0,.55)";
-      ctx.fillRect((VW - w) / 2, VH - 16, w, 8);
-      ctx.fillStyle = "#f2c230";
-      ctx.fillRect((VW - w) / 2, VH - 16, w * Math.max(0, f), 8);
-    }
+    // --- HUD da campanha (desenhado no canvas, por cima de tudo)
+    ctx.setTransform(FS, 0, 0, FS, 0, 0);
+    const st = tStats(),
+      f = Math.max(0, T.hp / st.max),
+      nests = LV.objs.filter((o) => o.nest).length;
+    ctx.fillStyle = "rgba(13,18,8,.62)";
+    ctx.fillRect(12, 12, 300, 92);
+    ctx.font = "12px 'Press Start 2P',monospace";
+    ctx.fillStyle = "#f2c230";
+    ctx.fillText(`MISSÃO ${camp.m + 1}: ${LV.M.n.toUpperCase()}`, 22, 32);
+    ctx.fillStyle = LV.done ? "#8be04f" : "#e6eed2";
+    ctx.font = "10px 'Press Start 2P',monospace";
+    ctx.fillText(
+      LV.done ? "VÁ PARA A EXTRAÇÃO!" : `NINHOS: ${LV.M.nests - nests}/${LV.M.nests}${LV.M.boss ? " · CHEFÃO" : ""}`,
+      22,
+      50,
+    );
+    ctx.fillStyle = "#000";
+    ctx.fillRect(22, 58, 190, 10);
+    ctx.fillStyle = f > 0.5 ? "#6ee04a" : f > 0.25 ? "#f2c230" : "#e0533a";
+    ctx.fillRect(22, 58, 190 * f, 10);
+    ctx.fillStyle = "#e6eed2";
+    ctx.fillText(`${Math.ceil(f * 100)}%`, 220, 68);
+    ctx.fillStyle = "#f2c230";
+    ctx.fillText(`$${money}  ★${score}`, 22, 90);
+    // canhão / metralhadora
+    const cf = 1 - Math.max(0, T.cd) / st.reload;
+    ctx.fillStyle = "#000";
+    ctx.fillRect(180, 80, 120, 5);
+    ctx.fillRect(180, 90, 120, 5);
+    ctx.fillStyle = cf >= 1 ? "#8be04f" : "#f2c230";
+    ctx.fillRect(180, 80, 120 * Math.min(1, cf), 5);
+    ctx.fillStyle = T.over ? "#ff5a2a" : T.heat > 0.7 ? "#ff9a3a" : "#e6eed2";
+    ctx.fillRect(180, 90, 120 * T.heat, 5);
+    // barra de progresso do mapa, com ninhos e extração
+    const bw = Math.min(420, VWt * 0.36),
+      bx = (VWt - bw) / 2,
+      by = 18;
+    ctx.fillStyle = "rgba(13,18,8,.62)";
+    ctx.fillRect(bx - 8, by - 8, bw + 16, 22);
+    ctx.fillStyle = "#3d5224";
+    ctx.fillRect(bx, by, bw, 6);
+    for (const o of LV.objs)
+      if (o.nest) {
+        ctx.fillStyle = "#b0ff5a";
+        ctx.fillRect(bx + (o.x / LV.L) * bw - 2, by - 2, 5, 10);
+      }
+    ctx.fillStyle = LV.done ? "#8be04f" : "#f2c230";
+    ctx.fillRect(bx + (LV.ex.x / LV.L) * bw - 2, by - 4, 4, 14);
+    ctx.fillStyle = "#e6eed2";
+    ctx.fillRect(bx + (T.x / LV.L) * bw - 4, by - 1, 8, 8);
     ctx.restore();
   }
   function tUI() {
-    if (!T) return;
-    const st = tStats(),
-      hp = Math.max(0, Math.ceil((T.hp / st.max) * 100)),
-      s = `t${wave}|${hp}|${score}|${money}`;
-    if (s !== lastUI) {
-      lastUI = s;
-      $("hWave").textContent = String(wave).padStart(2, "0") + "/" + MAX_WAVE;
-      $("hLife").textContent = hp + "%";
-      $("hLife").classList.toggle("low", hp <= 30);
-      $("hScore").textContent = score;
-      $("hMoney").textContent = money;
-    }
+    if (!T || !LV) return;
     const boss = tz.find((z) => z.d.big && !z.dead);
     if (boss) $("bossfill").style.width = Math.max(0, (boss.hp / boss.max) * 100) + "%";
     else if (!$("bossbar").hidden) $("bossbar").hidden = true;
   }
 
-  /* ---------- controles ---------- */
+  /* ---------- controles: teclado, mouse e tela de toque ---------- */
   const TANK_KEYS = new Set(["arrowup", "arrowdown", "arrowleft", "arrowright", "a", "d", " ", "b", "enter"]);
   function tKey(e, down) {
     const k = e.key.toLowerCase();
@@ -4308,11 +5086,12 @@
     if (MODE === "tank") tKey(e, false);
   });
   addEventListener("blur", () => tkeys.clear());
-  // mouse: a torreta segue o ponteiro e o clique atira com o canhão
   cv.addEventListener("pointermove", (e) => {
     if (MODE !== "tank" || e.pointerType !== "mouse") return;
-    const p = toLocal(e);
-    tin.mouse = unproject(p.x, p.y);
+    const r = cv.getBoundingClientRect(),
+      sx = ((e.clientX - r.left) * VIEW.w) / r.width + cam.x,
+      sy = ((e.clientY - r.top) * VIEW.h) / r.height + cam.y;
+    tin.mouse = wunproject(sx, sy);
     tin.touch = false;
   });
   cv.addEventListener("pointerdown", (e) => {
@@ -4322,73 +5101,99 @@
   addEventListener("pointerup", (e) => {
     if (MODE === "tank" && e.pointerType === "mouse") tin.cannon = false;
   });
-  // celular: joystick e botões
-  {
-    const joy = $("joy"),
-      knob = joy.querySelector("i");
-    let jid = null;
-    const setJ = (e) => {
-      const r = joy.getBoundingClientRect(),
-        cx = r.left + r.width / 2,
-        cy = r.top + r.height / 2,
+  // analógicos da tela (esquerdo = andar, direito = torreta)
+  function stickCtl(el, key) {
+    const knob = el.querySelector("i");
+    let id = null;
+    const set = (e) => {
+      const r = el.getBoundingClientRect(),
         R = r.width / 2;
-      let dx = (e.clientX - cx) / R,
-        dy = (e.clientY - cy) / R;
+      let dx = (e.clientX - (r.left + R)) / R,
+        dy = (e.clientY - (r.top + R)) / R;
       const m = Math.hypot(dx, dy);
       if (m > 1) {
         dx /= m;
         dy /= m;
       }
-      tin.joy = { x: dx, y: dy };
+      tin[key] = { x: dx, y: dy };
       knob.style.transform = `translate(${dx * R * 0.6}px,${dy * R * 0.6}px)`;
     };
-    joy.addEventListener("pointerdown", (e) => {
+    el.addEventListener("pointerdown", (e) => {
       audio();
-      jid = e.pointerId;
+      id = e.pointerId;
       try {
-        joy.setPointerCapture(jid);
+        el.setPointerCapture(id);
       } catch (err) {}
       tin.touch = true;
       tin.mouse = null;
-      setJ(e);
+      set(e);
     });
-    joy.addEventListener("pointermove", (e) => e.pointerId === jid && setJ(e));
+    el.addEventListener("pointermove", (e) => e.pointerId === id && set(e));
     const end = (e) => {
-      if (e.pointerId !== jid) return;
-      jid = null;
-      tin.joy = null;
+      if (e.pointerId !== id) return;
+      id = null;
+      tin[key] = null;
       knob.style.transform = "";
     };
-    joy.addEventListener("pointerup", end);
-    joy.addEventListener("pointercancel", end);
-    for (const [id, key] of [
-      ["tbCannon", "cannon"],
-      ["tbMG", "mg"],
-    ]) {
-      const b = $(id);
-      b.addEventListener("pointerdown", (e) => {
-        audio();
-        e.preventDefault();
-        try {
-          b.setPointerCapture(e.pointerId);
-        } catch (err) {}
-        tin[key] = true;
-        tin.touch = true;
-        tin.mouse = null;
-        b.classList.add("on");
-      });
-      const up = () => {
-        tin[key] = false;
-        b.classList.remove("on");
-      };
-      b.addEventListener("pointerup", up);
-      b.addEventListener("pointercancel", up);
-    }
+    el.addEventListener("pointerup", end);
+    el.addEventListener("pointercancel", end);
   }
+  stickCtl($("joy"), "joy");
+  stickCtl($("joy2"), "joy2");
+  for (const [id, key] of [
+    ["tbCannon", "cannon"],
+    ["tbMG", "mg"],
+  ]) {
+    const b = $(id);
+    b.addEventListener("pointerdown", (e) => {
+      audio();
+      e.preventDefault();
+      try {
+        b.setPointerCapture(e.pointerId);
+      } catch (err) {}
+      tin[key] = true;
+      tin.touch = true;
+      tin.mouse = null;
+      b.classList.add("on");
+    });
+    const up = () => {
+      tin[key] = false;
+      b.classList.remove("on");
+    };
+    b.addEventListener("pointerup", up);
+    b.addEventListener("pointercancel", up);
+  }
+  $("tpause").addEventListener("click", () => {
+    audio();
+    togglePause();
+  });
 
   /* ---------- layout + loop ---------- */
   function fit() {
     const st = $("stage");
+    if (MODE === "tank") {
+      // modo tanque: tela cheia, a largura da visão acompanha a proporção da tela
+      const aw = st.clientWidth,
+        ah = st.clientHeight;
+      if (!aw || !ah) return;
+      const dpr = devicePixelRatio || 1,
+        vh = matchMedia("(pointer: coarse)").matches ? 560 : 680,
+        vw = Math.round((vh * aw) / ah),
+        s = ah / vh;
+      VIEW.w = vw;
+      VIEW.h = vh;
+      cv.style.width = fxc.style.width = aw + "px";
+      cv.style.height = fxc.style.height = ah + "px";
+      CSS_S = s;
+      const nf = Math.round(Math.min(1.6, s * dpr) * 20) / 20;
+      if (nf !== FS || !vign || cv.width !== Math.round(vw * nf) || cv.height !== Math.round(vh * nf)) {
+        FS = nf;
+        fxc.width = cv.width = Math.round(vw * FS);
+        fxc.height = cv.height = Math.round(vh * FS);
+        buildVign();
+      }
+      return;
+    }
     const aw = st.clientWidth - 10,
       ah = st.clientHeight - 12;
     const dpr = devicePixelRatio || 1;
@@ -4397,7 +5202,7 @@
     cv.style.height = fxc.style.height = Math.floor(VH * s) + "px";
     CSS_S = s;
     const nf = Math.round(Math.min(1.6, s * dpr) * 20) / 20; // pixels do canvas por unidade de tela
-    if (nf !== FS || !vign) {
+    if (nf !== FS || !vign || cv.width !== Math.round(VW * nf)) {
       FS = nf;
       fxc.width = cv.width = Math.round(VW * FS);
       fxc.height = cv.height = Math.round(VH * FS);
@@ -4425,9 +5230,14 @@
       sy = rnd(-1, 1) * off * 0.7,
       tr = `translate(calc(-50% + ${(sx * K * CSS_S).toFixed(1)}px),calc(-50% + ${(sy * K * CSS_S).toFixed(1)}px))`;
     cv.style.transform = fxc.style.transform = tr;
-    if (MODE === "tank") tRender();
-    else render();
-    drawFx(0, 0);
+    pollPad();
+    if (MODE === "tank" && LV) {
+      tRender();
+      drawFx(-cam.x, -cam.y);
+    } else {
+      if (MODE !== "tank") render();
+      drawFx(0, 0);
+    }
     if (MODE === "tank") tUI();
     else updUI();
     if (state === "tsetup") drawPreview(now / 1000);
