@@ -2952,7 +2952,7 @@
     } else if (k === "restart") MODE === "tank" ? tRetry() : startGame(false);
     else if (k === "tretry") tRetry();
     else if (k === "treset") {
-      camp = { m: 0, money: 100, lv: {}, score: 0 };
+      camp = { m: 0, money: 100, lv: {}, score: 0, acc: accDefault() };
       saveCamp();
       tStart();
     } else if (k === "tsetup") showTankSetup();
@@ -2967,6 +2967,7 @@
       showTankSetup();
       ov.scrollTop = y;
     } else if (k === "tup") buyUpgrade(a.dataset.k);
+    else if (k === "tacc") buyAcc(a.dataset.k);
     else if (k === "trep") buyRepair();
     else if (k === "tnext") nextWave();
     else if (k === "continue") startGame(true);
@@ -3533,6 +3534,27 @@
     c.fillRect(-R * 0.1 + 2.5, -R * 0.62 + 0.9, 9, 0.9);
     c.fillStyle = "#4fe3d0";
     c.fillRect(-R * 0.1 + 2.6, -R * 0.62 + 2.1, 0.5, 0.5);
+    // lançador de mísseis no teto (acessório), apontado para o alto
+    if (t.pod) {
+      for (let h = 11.5; h <= 18; h += 0.35) {
+        tur(h);
+        const sh = (h - 11.5) * 0.45;
+        c.fillStyle = h < 18 ? (h < 13 ? "#1d1f17" : cm.side) : cm.base;
+        c.fillRect(-R * 0.55 + sh - 3, R * 0.75 - 2.2, 6, 4.4);
+      }
+      tur(18);
+      c.fillStyle = "#111";
+      for (const [ox, oy] of [
+        [-1.4, -1.1],
+        [1.2, -1.1],
+        [-1.4, 1.1],
+        [1.2, 1.1],
+      ]) {
+        c.beginPath();
+        c.arc(-R * 0.55 + 2.9 + ox, R * 0.75 + oy, 0.85, 0, 7);
+        c.fill();
+      }
+    }
     // antenas (em pé, na tela)
     c.setTransform(1, 0, 0, 1, 0, 0);
     c.strokeStyle = "rgba(20,20,14,.9)";
@@ -3820,6 +3842,13 @@
         y = (1 + R() * (Wc - 2)) * CELL;
       LV.sleepers.push({ x, y, type: M.zs[(R() * M.zs.length) | 0] });
     }
+    // caixas azuis de armas (acessórios); a primeira missão tem uma logo no começo
+    LV.arms = [];
+    if (m === 0) LV.arms.push({ x: 9 * CELL, y: roadY(9 * CELL) + 14 });
+    for (let i = 0; i < 2; i++) {
+      const x = (14 + R() * (Lc - 20)) * CELL;
+      LV.arms.push({ x, y: roadY(x) + (R() - 0.5) * 2 * CELL });
+    }
     // extração no fim
     LV.ex = { x: (Lc - 2.5) * CELL, y: roadY((Lc - 2.5) * CELL) };
     if (M.boss) LV.sleepers.push({ x: (Lc - 6) * CELL, y: roadY((Lc - 6) * CELL), type: "boss" });
@@ -3859,7 +3888,7 @@
     lv = Object.assign({}, camp.lv);
     money = camp.money;
     score = camp.score;
-    snap = { money: camp.money, lv: Object.assign({}, camp.lv), score: camp.score };
+    snap = { money: camp.money, lv: Object.assign({}, camp.lv), score: camp.score, acc: cloneAcc(camp.acc) };
     buildLevel(camp.m);
     wave = camp.m + 1;
     const st = tStats();
@@ -3884,6 +3913,12 @@
     tcorpse = [];
     tdrops = [];
     tdec = [];
+    for (const a of LV.arms) tdrops.push({ x: a.x, y: a.y, kind: "arm", t: 0, life: 1e9 });
+    acc = cloneAcc(camp.acc);
+    if (!acc[specSel].own) specSel = SPECIALS.find((k) => acc[k].own) || "missile";
+    tmines = [];
+    clouds = [];
+    accCd = { missile: 0, mine: 0, smoke: 0 };
     kills = 0;
     state = "play";
     waveState = "fight";
@@ -3923,6 +3958,7 @@
       camp.money = money;
       camp.lv = Object.assign({}, lv);
       camp.score = score;
+      camp.acc = cloneAcc(acc);
       saveCamp();
       if (score > tankBest) {
         tankBest = score;
@@ -3934,7 +3970,7 @@
           showOv(`<h2 class="title" style="font-size:clamp(24px,6vw,42px)">CAMPANHA<br>CONCLUÍDA!</h2><p class="sub">Você destruiu a Fortaleza Zumbi</p>
  <div class="res"><div>PONTOS<b>${score}</b></div><div>RECORDE<b>${tankBest}</b></div></div>
  <button class="big" data-a="treset">NOVA CAMPANHA</button><button class="alt" data-a="menu">MENU</button>`);
-          camp = { m: 0, money: 100, lv: {}, score: 0 };
+          camp = { m: 0, money: 100, lv: {}, score: 0, acc: accDefault() };
           saveCamp();
         } else showShop(bonus);
       }, 1400);
@@ -3952,6 +3988,7 @@
     camp.money = snap.money;
     camp.lv = snap.lv;
     camp.score = snap.score;
+    camp.acc = cloneAcc(snap.acc);
     saveCamp();
     tStart();
   }
@@ -3976,7 +4013,7 @@
  ${optRow("CAMUFLAGEM", "camo", CAMO)}
  ${optRow("CANHÃO", "cannon", CANNON, (o) => o.desc)}
  ${optRow("CHASSI", "chassis", CHASSIS, (o) => o.desc)}
- <p class="hint">PC: W A S D anda · setas ou mouse giram a torreta · ESPAÇO ou botão esquerdo = canhão · SHIFT ou botão direito = metralhadora<br>Controle (PS4): analógico esquerdo anda · direito mira · R2/R1/X canhão · L2/L1/□ metralhadora · OPTIONS pausa<br>Celular: tela cheia, analógico esquerdo anda e direito gira a torreta</p>
+ <p class="hint">PC: W/S frente e ré · A/D giram o tanque · setas ou mouse = torreta · ESPAÇO ou clique esq. = canhão · SHIFT ou clique dir. = metralhadora · E = acessório · Q = fumaça · TAB/roda = troca<br>Controle PS4: analógico esq. frente/ré e giro · analógico dir. torreta · R2 canhão · R1 metralhadora · L1 acessório · L2 fumaça · ←/→ troca · OPTIONS pausa<br>Celular: os mesmos comandos nos analógicos e botões da tela</p>
  <button class="big" data-a="tgo">${camp.m > 0 ? "CONTINUAR CAMPANHA ▶" : "INICIAR CAMPANHA ▶"}</button>${camp.m > 0 ? '<button class="alt" data-a="treset">RECOMEÇAR</button>' : ""}<button class="alt" data-a="menu">VOLTAR</button>`);
     drawPreview(0);
   }
@@ -3993,11 +4030,12 @@
     x.fillStyle = g;
     x.fillRect(0, 0, c.width, c.height);
     const M = [s * 0.95, -s * 0.52, s * 0.95, s * 0.52, 270, 205];
+    const pod = !!(camp.acc && camp.acc.missile && camp.acc.missile.own);
     drawTank(
       x,
       M,
       s * 1.08,
-      { x: 0, y: 0, ang: 0.5, tur: 0.5 + Math.sin(time * 0.8) * 0.7, phase: time * 8, rec: 0 },
+      { x: 0, y: 0, ang: 0.5, tur: 0.5 + Math.sin(time * 0.8) * 0.7, phase: time * 8, rec: 0, pod },
       tcfg,
     );
   }
@@ -4011,7 +4049,14 @@
    const l = lv[u.k] || 0,
      cost = UPG_COST[l];
    return `<div class="ucard"><div class="nm">${u.n}</div><div class="d">${u.desc}</div><div class="lvl">${"★".repeat(l)}${"☆".repeat(3 - l)}</div>${l >= 3 ? '<div class="lock">NÍVEL MÁXIMO</div>' : `<button class="alt" data-a="tup" data-k="${u.k}" ${money < cost ? "disabled" : ""} style="margin:0"><i class="coin"></i>${cost}</button>`}</div>`;
- }).join("")}</div>
+ }).join("")}${Object.keys(ACC)
+   .map((k) => {
+     const d = ACC[k],
+       a = acc[k];
+     const key = k === "smoke" ? "L2 · Q" : "L1 · E";
+     return `<div class="ucard acc"><div class="nm">${d.n}</div><div class="d">${d.desc}<br><b>${key}</b></div><div class="lvl">${a.own ? "x" + a.ammo : "—"}</div>${!a.own ? `<button class="alt" data-a="tacc" data-k="${k}" ${money < d.unlock ? "disabled" : ""} style="margin:0"><i class="coin"></i>${d.unlock}</button>` : a.ammo >= d.max ? '<div class="lock">CHEIO</div>' : `<button class="alt" data-a="tacc" data-k="${k}" ${money < d.packCost ? "disabled" : ""} style="margin:0">+${d.pack} <i class="coin"></i>${d.packCost}</button>`}</div>`;
+   })
+   .join("")}</div>
  <button class="big" data-a="tnext">PRÓXIMA MISSÃO ▶</button><button class="alt" data-a="tsetup">GARAGEM</button>`);
   }
   function buyUpgrade(k) {
@@ -4268,6 +4313,258 @@
     sfx("shot");
   }
 
+  /* ---------- ACESSÓRIOS (armas extras) ----------
+     L1 / E = acessório especial selecionado (mísseis ou minas) · ←/→ do controle, Tab ou roda do mouse trocam
+     L2 / Q = lança-fumaça. Compre na Oficina ou ache nas caixas azuis do mapa. */
+  const ACC = {
+    missile: {
+      n: "Mísseis",
+      desc: "Lançador no teto: o míssil cai onde está a mira",
+      unlock: 150,
+      pack: 4,
+      packCost: 90,
+      max: 12,
+      cd: 1.1,
+    },
+    mine: { n: "Minas", desc: "Solta uma mina atrás do tanque", unlock: 120, pack: 3, packCost: 70, max: 9, cd: 0.7 },
+    smoke: {
+      n: "Fumaça",
+      desc: "Nuvem que deixa os zumbis perdidos",
+      unlock: 100,
+      pack: 2,
+      packCost: 60,
+      max: 6,
+      cd: 2.5,
+    },
+  };
+  const SPECIALS = ["missile", "mine"];
+  const accDefault = () => ({
+    missile: { own: false, ammo: 0 },
+    mine: { own: false, ammo: 0 },
+    smoke: { own: false, ammo: 0 },
+  });
+  const cloneAcc = (a) => JSON.parse(JSON.stringify(a || accDefault()));
+  let acc = accDefault(),
+    specSel = "missile",
+    accCd = { missile: 0, mine: 0, smoke: 0 },
+    tmines = [],
+    clouds = [],
+    aimDist = 170;
+  function cycleSpec(dir) {
+    const own = SPECIALS.filter((k) => acc[k].own);
+    if (!own.length) return banner("SEM ACESSÓRIO: COMPRE NA OFICINA OU ACHE NO MAPA", 1.8);
+    let i = own.indexOf(specSel);
+    specSel = own[(i + dir + own.length) % own.length];
+    sfx("reload");
+    banner(`${ACC[specSel].n.toUpperCase()} x${acc[specSel].ammo}`, 1);
+  }
+  // ponto onde o míssil cai: o mouse (PC) ou a frente da torreta (controle/celular)
+  function aimPoint() {
+    if (tin.mouse) {
+      const dx = tin.mouse.x - T.x,
+        dy = tin.mouse.y - T.y,
+        d = Math.hypot(dx, dy) || 1,
+        k = Math.max(40, Math.min(320, d)) / d;
+      return { x: T.x + dx * k, y: T.y + dy * k };
+    }
+    return { x: T.x + Math.cos(T.tur) * aimDist, y: T.y + Math.sin(T.tur) * aimDist };
+  }
+  function useAcc(k) {
+    const a = acc[k];
+    if (!a.own) {
+      if (!useAcc.warned || performance.now() - useAcc.warned > 1500) {
+        useAcc.warned = performance.now();
+        banner(`${ACC[k].n.toUpperCase()}: COMPRE NA OFICINA OU ACHE NO MAPA`, 1.6);
+      }
+      return;
+    }
+    if (accCd[k] > 0) return;
+    if (a.ammo <= 0) {
+      accCd[k] = 0.6;
+      txt(...P(T.x, T.y, 30), "SEM MUNIÇÃO", "255,120,80");
+      return;
+    }
+    a.ammo--;
+    accCd[k] = ACC[k].cd;
+    if (k === "missile") {
+      // sai do lançador no teto, sobe e cai no alvo
+      const tg = aimPoint(),
+        side = T.tur + Math.PI / 2,
+        R = CHASSIS[tcfg.chassis].W * 0.35,
+        x0 = T.x + Math.cos(side) * R * 0.75,
+        y0 = T.y + Math.sin(side) * R * 0.75,
+        d = Math.hypot(tg.x - x0, tg.y - y0);
+      tp.push({ k: "msl", x0, y0, x: x0, y: y0, tx: tg.x, ty: tg.y, h: 16, t: 0, T: 0.7 + d / 420, vx: 0, vy: 0 });
+      const [a2, b2] = P(x0, y0, 17);
+      for (let i = 0; i < 6; i++)
+        G(GL.sl, a2, b2, {
+          add: false,
+          a: 0.5,
+          smoke: 1,
+          vx: rnd(-14, 14),
+          vy: rnd(-4, 10),
+          r0: 2,
+          r1: rnd(6, 11),
+          life: rnd(0.8, 1.4),
+          drag: 1.5,
+        });
+      G(GL.o, a2, b2, { r0: 4, r1: 8, life: 0.12 });
+      sfx("launch");
+      rumble(0.3, 80);
+    } else if (k === "mine") {
+      const x = T.x - Math.cos(T.ang) * 18,
+        y = T.y - Math.sin(T.ang) * 18;
+      tmines.push({ x, y, arm: 0.8, t: 0 });
+      sfx("place");
+    } else if (k === "smoke") {
+      // 4 granadas de fumaça em leque à frente da torreta
+      for (let i = 0; i < 4; i++) {
+        const a3 = T.tur + (i - 1.5) * 0.45,
+          d = 55 + Math.abs(i - 1.5) * 8;
+        tp.push({
+          k: "smk",
+          x0: T.x,
+          y0: T.y,
+          x: T.x,
+          y: T.y,
+          tx: T.x + Math.cos(a3) * d,
+          ty: T.y + Math.sin(a3) * d,
+          h: 12,
+          t: 0,
+          T: 0.55,
+          vx: 0,
+          vy: 0,
+        });
+      }
+      sfx("throw");
+    }
+  }
+  function buyAcc(k) {
+    const a = acc[k],
+      d = ACC[k];
+    if (!a.own) {
+      if (money < d.unlock) return;
+      money -= d.unlock;
+      a.own = true;
+      a.ammo = d.pack;
+      if (SPECIALS.includes(k)) specSel = k;
+    } else {
+      if (money < d.packCost || a.ammo >= d.max) return;
+      money -= d.packCost;
+      a.ammo = Math.min(d.max, a.ammo + d.pack);
+    }
+    camp.money = money;
+    camp.acc = cloneAcc(acc);
+    saveCamp();
+    sfx("coin");
+    showShop();
+  }
+  // caixa azul de armas achada no mapa
+  function pickArmCrate() {
+    const notOwned = Object.keys(ACC).filter((k) => !acc[k].own);
+    let k;
+    if (notOwned.length) {
+      k = notOwned.includes("missile") ? "missile" : notOwned[0];
+      acc[k].own = true;
+      acc[k].ammo = ACC[k].pack;
+      if (SPECIALS.includes(k)) specSel = k;
+      banner(`NOVO ACESSÓRIO: ${ACC[k].n.toUpperCase()}! (${k === "smoke" ? "L2 / Q" : "L1 / E"})`, 2.6);
+    } else {
+      k = Object.keys(ACC)[(Math.random() * 3) | 0];
+      acc[k].ammo = Math.min(ACC[k].max, acc[k].ammo + ACC[k].pack);
+      banner(`+${ACC[k].pack} ${ACC[k].n.toUpperCase()}`, 1.6);
+    }
+  }
+  // atualiza mísseis, granadas de fumaça, minas e nuvens
+  function accUpdate(dt) {
+    for (const k in accCd) accCd[k] = Math.max(0, accCd[k] - dt);
+    for (const p of tp) {
+      if (p.k !== "msl" && p.k !== "smk") continue;
+      p.t += dt;
+      const f = Math.min(1, p.t / p.T),
+        ox = p.x,
+        oy = p.y;
+      p.x = p.x0 + (p.tx - p.x0) * f;
+      p.y = p.y0 + (p.ty - p.y0) * f;
+      p.h = p.k === "msl" ? 16 * (1 - f) + 95 * Math.sin(Math.PI * f) : 12 * (1 - f) + 30 * Math.sin(Math.PI * f);
+      p.vx = (p.x - ox) / Math.max(dt, 0.001);
+      p.vy = (p.y - oy) / Math.max(dt, 0.001);
+      if (p.k === "msl") {
+        const [a, b] = P(p.x, p.y, p.h);
+        G(Math.random() < 0.5 ? GL.sl : GL.sd, a, b, {
+          add: false,
+          a: 0.4,
+          smoke: 1,
+          vx: rnd(-5, 5),
+          vy: rnd(-4, 2),
+          r0: 1.4,
+          r1: rnd(5, 8),
+          life: rnd(0.8, 1.3),
+          drag: 1,
+        });
+        G(GL.o, a, b, { r0: 2.5, r1: 1, life: 0.06 });
+      }
+      if (f >= 1) {
+        p.dead = true;
+        if (p.k === "msl") {
+          boomAt(p.tx, p.ty, 130, 34, 2.1);
+          rumble(0.5, 150);
+        } else clouds.push({ x: p.tx, y: p.ty, r: 42, life: 7, t: 0 });
+      }
+    }
+    for (const m of tmines) {
+      m.t += dt;
+      m.arm -= dt;
+      if (m.arm > 0) continue;
+      for (const z of tz)
+        if (!z.dead && Math.hypot(z.x - m.x, z.y - m.y) < z.r + 6) {
+          m.dead = true;
+          boomAt(m.x, m.y, 150, 30, 1.9);
+          break;
+        }
+    }
+    tmines = tmines.filter((m) => !m.dead);
+    for (const c of clouds) {
+      c.life -= dt;
+      c.t += dt;
+      if (Math.random() < dt * 30) {
+        const a = rnd(0, 6.28),
+          r = Math.sqrt(Math.random()) * c.r,
+          [fx0, fy0] = P(c.x + Math.cos(a) * r, c.y + Math.sin(a) * r, rnd(0, 6));
+        G(Math.random() < 0.7 ? GL.sl : GL.dust, fx0, fy0, {
+          add: false,
+          a: c.life < 1.5 ? 0.35 : 0.75,
+          smoke: 1,
+          vx: rnd(-6, 6),
+          vy: -rnd(2, 6),
+          r0: 8,
+          r1: rnd(20, 32),
+          life: rnd(1.8, 2.8),
+          drag: 0.4,
+        });
+      }
+      // zumbis dentro da fumaça ficam perdidos: andam sem rumo e não atacam
+      for (const z of tz) if (!z.dead && Math.hypot(z.x - c.x, z.y - c.y) < c.r + z.r) z.lost = 1.2;
+    }
+    clouds = clouds.filter((c) => c.life > 0);
+  }
+  function drawMine(M, m) {
+    const lay = layerFn(M, m.x, m.y, 0);
+    lay(0);
+    ctx.fillStyle = "rgba(0,0,0,.3)";
+    ctx.beginPath();
+    ctx.arc(1, 1, 4.5, 0, 7);
+    ctx.fill();
+    cyl(lay, 3.6, 1.6, "#2a2d22", "#5a5e4c");
+    if (m.arm <= 0 && ((m.t * 3) | 0) % 2) {
+      lay(1.7);
+      ctx.fillStyle = "#ff3b2a";
+      ctx.beginPath();
+      ctx.arc(0, 0, 0.9, 0, 7);
+      ctx.fill();
+    }
+  }
+
   /* ---------- controle de videogame (Gamepad API, PS4 genérico) ---------- */
   const pad = {
     lx: 0,
@@ -4276,10 +4573,8 @@
     ry: 0,
     cannon: false,
     mg: false,
-    up: false,
-    down: false,
-    left: false,
-    right: false,
+    spec: false,
+    smoke: false,
     prev: [],
     id: "",
   };
@@ -4301,7 +4596,7 @@
     } catch (e) {}
     if (!gp) {
       pad.lx = pad.ly = pad.rx = pad.ry = 0;
-      pad.cannon = pad.mg = false;
+      pad.cannon = pad.mg = pad.spec = pad.smoke = false;
       return;
     }
     if (pad.id !== gp.id) {
@@ -4316,20 +4611,17 @@
     // controles genéricos sem mapeamento padrão costumam usar os eixos 2 e 5 para o analógico direito
     pad.rx = dz(gp.axes[2] || 0);
     pad.ry = dz((std ? gp.axes[3] : gp.axes.length > 5 ? gp.axes[5] : gp.axes[3]) || 0);
-    if (std) {
-      pad.cannon = btn(7) || btn(5) || btn(0);
-      pad.mg = btn(6) || btn(4) || btn(2);
-      pad.up = btn(12);
-      pad.down = btn(13);
-      pad.left = btn(14);
-      pad.right = btn(15);
-    } else {
-      pad.cannon = btn(7) || btn(5) || btn(1);
-      pad.mg = btn(6) || btn(4) || btn(0);
-      pad.up = pad.down = pad.left = pad.right = false;
-    }
+    // R2 = canhão · R1 = metralhadora · L1 = acessório · L2 = fumaça · direcional ←/→ troca o acessório
+    pad.cannon = btn(7);
+    pad.mg = btn(5);
+    pad.spec = btn(4);
+    pad.smoke = btn(6);
     const pressed = gp.buttons.map((b, i) => btn(i)),
       edge = (i) => pressed[i] && !pad.prev[i];
+    if (MODE === "tank" && state === "play") {
+      if (edge(14)) cycleSpec(-1);
+      if (edge(15)) cycleSpec(1);
+    }
     // OPTIONS/START = pausa; X confirma o botão principal das telas
     if (edge(9)) {
       if (MODE === "tank" && (state === "play" || state === "pause")) togglePause();
@@ -4339,7 +4631,7 @@
       if (b) b.click();
     }
     pad.prev = pressed;
-    if (pad.lx || pad.ly || pad.rx || pad.ry || pad.cannon || pad.mg) {
+    if (pad.lx || pad.ly || pad.rx || pad.ry || pad.cannon || pad.mg || pad.spec || pad.smoke) {
       tin.mouse = null;
       tin.touch = false;
     }
@@ -4348,23 +4640,16 @@
 
   function tUpdate(dt) {
     const st = tStats();
-    // --- movimento: teclado, controle ou analógico da tela
-    // WASD (e o direcional do controle) apontam a direção na tela, como o analógico:
-    // o tanque gira para lá e anda
-    let fwd = 0,
-      rot = 0;
-    const kx = (tkeys.has("d") || pad.right ? 1 : 0) - (tkeys.has("a") || pad.left ? 1 : 0),
-      ky = (tkeys.has("s") || pad.down ? 1 : 0) - (tkeys.has("w") || pad.up ? 1 : 0);
-    const stick = tin.joy || (pad.lx || pad.ly ? { x: pad.lx, y: pad.ly } : kx || ky ? { x: kx, y: ky } : null);
+    // --- movimento estilo tanque (igual em teclado, controle e tela):
+    // frente = acelera, trás = ré (sem girar), lados = giram o casco
+    let fwd = (tkeys.has("w") ? 1 : 0) - (tkeys.has("s") ? 1 : 0),
+      rot = (tkeys.has("d") ? 1 : 0) - (tkeys.has("a") ? 1 : 0);
+    const stick = tin.joy || (pad.lx || pad.ly ? { x: pad.lx, y: pad.ly } : null);
     if (stick) {
-      // o casco gira para a direção apontada na tela e anda para frente
-      const m = Math.min(1, Math.hypot(stick.x, stick.y));
-      if (m > 0.15) {
-        const want = screenToGroundDir(stick.x, stick.y),
-          d = angDiff(want, T.ang);
-        T.ang = turnTo(T.ang, want, st.turn * 1.3 * dt);
-        fwd = m * Math.max(0, Math.cos(d));
-      }
+      const sy = -stick.y,
+        sx = stick.x;
+      fwd = Math.abs(sy) > 0.2 ? Math.max(-1, Math.min(1, sy * 1.15)) : 0;
+      rot = Math.abs(sx) > 0.2 ? Math.max(-1, Math.min(1, sx * 1.15)) : 0;
     }
     T.ang += rot * st.turn * dt;
     const target = fwd * st.speed * (fwd < 0 ? 0.6 : 1);
@@ -4405,8 +4690,10 @@
       ay = (tkeys.has("arrowdown") ? 1 : 0) - (tkeys.has("arrowup") ? 1 : 0),
       aim =
         tin.joy2 || (Math.hypot(pad.rx, pad.ry) > 0.3 ? { x: pad.rx, y: pad.ry } : ax || ay ? { x: ax, y: ay } : null);
-    if (aim && Math.hypot(aim.x, aim.y) > 0.25) T.tur = turnTo(T.tur, screenToGroundDir(aim.x, aim.y), 4.5 * dt);
-    else if (tin.mouse) T.tur = turnTo(T.tur, Math.atan2(tin.mouse.y - T.y, tin.mouse.x - T.x), 4 * dt);
+    if (aim && Math.hypot(aim.x, aim.y) > 0.25) {
+      T.tur = turnTo(T.tur, screenToGroundDir(aim.x, aim.y), 4.5 * dt);
+      if (tin.joy2 || pad.rx || pad.ry) aimDist = 90 + 200 * Math.min(1, Math.hypot(aim.x, aim.y)); // empurrar mais = mira mais longe
+    } else if (tin.mouse) T.tur = turnTo(T.tur, Math.atan2(tin.mouse.y - T.y, tin.mouse.x - T.x), 4 * dt);
     // --- armas
     T.cd -= dt;
     T.mgCd -= dt;
@@ -4418,6 +4705,9 @@
     if (wantMG && !T.over && T.mgCd <= 0) fireMG(st);
     T.heat = Math.max(0, T.heat - dt * (wantMG && !T.over ? 0.05 : 0.38));
     if (T.over && T.heat < 0.3) T.over = false;
+    if (tin.spec || pad.spec || tkeys.has("e")) useAcc(specSel);
+    if (tin.smoke || pad.smoke || tkeys.has("q")) useAcc("smoke");
+    accUpdate(dt);
     // --- zumbis que acordam quando o tanque chega perto
     for (const s of LV.sleepers)
       if (!s.woke && Math.hypot(s.x - T.x, s.y - T.y) < (s.type === "boss" ? 260 : 300)) {
@@ -4457,6 +4747,15 @@
         dist = Math.hypot(dx, dy),
         reach = z.r + 13;
       let move = dist < 520;
+      if (z.lost > 0) {
+        // perdido na fumaça: anda sem rumo, devagar, e não ataca
+        z.lost -= dt;
+        z.bite = false;
+        z.wa = (z.wa ?? rnd(0, 6.28)) + rnd(-2, 2) * dt;
+        z.x += Math.cos(z.wa) * d.sp * 0.8 * dt;
+        z.y += Math.sin(z.wa) * d.sp * 0.8 * dt;
+        continue;
+      }
       if (d.gun) {
         z.gun -= dt;
         if (z.burst > 0) {
@@ -4559,6 +4858,7 @@
     }
     // --- projéteis do tanque
     for (const p of tp) {
+      if (p.k === "msl" || p.k === "smk") continue; // tratados em accUpdate
       p.life -= dt;
       p.x += p.vx * dt;
       p.y += p.vy * dt;
@@ -4641,7 +4941,8 @@
         c.life = 0;
         const [a, b] = P(c.x, c.y, 6);
         G(GL.y, a, b, { r0: 4, r1: 16, life: 0.3 });
-        if (c.kind === "rep") {
+        if (c.kind === "arm") pickArmCrate();
+        else if (c.kind === "rep") {
           T.hp = Math.min(st.max, T.hp + st.max * 0.2);
           txt(a, b - 8, "REPARO +20%", "140,235,90");
         } else {
@@ -5008,6 +5309,28 @@
       ctx.fillStyle = "rgba(255,240,180,.35)";
       for (let i = 30; i < 160; i += 8) ctx.fillRect(i, -0.5, 3, 1);
     }
+    // mira do míssil no chão
+    if (acc.missile.own && specSel === "missile" && state === "play") {
+      const ap = aimPoint(),
+        pul = 1 + Math.sin(performance.now() / 160) * 0.12;
+      ctx.setTransform(M[0], M[1], M[2], M[3], M[4], M[5]);
+      ctx.translate(ap.x, ap.y);
+      ctx.strokeStyle = acc.missile.ammo > 0 && accCd.missile <= 0 ? "rgba(255,80,50,.85)" : "rgba(255,255,255,.35)";
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.arc(0, 0, 12 * pul, 0, 7);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(-17, 0);
+      ctx.lineTo(-7, 0);
+      ctx.moveTo(7, 0);
+      ctx.lineTo(17, 0);
+      ctx.moveTo(0, -17);
+      ctx.lineTo(0, -7);
+      ctx.moveTo(0, 7);
+      ctx.lineTo(0, 17);
+      ctx.stroke();
+    }
     // --- tudo o que fica em pé, ordenado pela profundidade
     const vis = (x, y, m = 120) => {
       const [sx, sy] = wiso(x, y);
@@ -5057,9 +5380,9 @@
         ctx.scale(K, K);
         ctx.fillStyle = "#141a0e";
         ctx.fillRect(-5, -9, 11, 9);
-        ctx.fillStyle = c.kind === "rep" ? "#d8dcd2" : "#9a6a32";
+        ctx.fillStyle = c.kind === "arm" ? "#3a5a8a" : c.kind === "rep" ? "#d8dcd2" : "#9a6a32";
         ctx.fillRect(-4, -8, 9, 7);
-        ctx.fillStyle = c.kind === "rep" ? "#c0392b" : "#f2c230";
+        ctx.fillStyle = c.kind === "arm" ? "#e6eed2" : c.kind === "rep" ? "#c0392b" : "#f2c230";
         ctx.fillRect(0, -8, 1, 7);
         ctx.fillRect(-4, -5, 9, 1);
         ctx.restore();
@@ -5091,9 +5414,11 @@
         },
         0.5,
       );
+    T.pod = acc.missile.own;
     push(T.x, T.y, () => {
       drawTank(ctx, M, FS * K, T, tcfg, T.fl);
     });
+    for (const m of tmines) push(m.x, m.y, () => drawMine(M, m), -2);
     list.sort((a, b) => a.d - b.d);
     for (const it of list) it.f();
     // projéteis com brilho
@@ -5108,7 +5433,14 @@
         ctx.drawImage(GL.g, sx - 5 * K, sy - 5 * K, 10 * K, 10 * K);
         continue;
       }
-      ctx.strokeStyle = p.k === "shell" ? "rgba(255,170,70,.95)" : "rgba(255,228,150,.95)";
+      if (p.k === "smk") {
+        ctx.globalCompositeOperation = "source-over";
+        ctx.fillStyle = "#3a3d34";
+        ctx.fillRect(sx - 1.5 * K, sy - 1.5 * K, 3 * K, 3 * K);
+        ctx.globalCompositeOperation = "lighter";
+        continue;
+      }
+      ctx.strokeStyle = p.k === "shell" || p.k === "msl" ? "rgba(255,170,70,.95)" : "rgba(255,228,150,.95)";
       ctx.lineWidth = (p.k === "shell" ? 1.4 : 0.7) * K;
       ctx.beginPath();
       ctx.moveTo(ex, ey);
@@ -5132,7 +5464,7 @@
       f = Math.max(0, T.hp / st.max),
       nests = LV.objs.filter((o) => o.nest).length;
     ctx.fillStyle = "rgba(13,18,8,.62)";
-    ctx.fillRect(12, 12, 300, 92);
+    ctx.fillRect(12, 12, 300, 118);
     ctx.font = "12px 'Press Start 2P',monospace";
     ctx.fillStyle = "#f2c230";
     ctx.fillText(`MISSÃO ${camp.m + 1}: ${LV.M.n.toUpperCase()}`, 22, 32);
@@ -5151,6 +5483,24 @@
     ctx.fillText(`${Math.ceil(f * 100)}%`, 220, 68);
     ctx.fillStyle = "#f2c230";
     ctx.fillText(`$${money}  ★${score}`, 22, 90);
+    // acessórios: o selecionado (L1/E) em destaque, e a fumaça (L2/Q)
+    ctx.font = "9px 'Press Start 2P',monospace";
+    let ax0 = 22;
+    for (const k of [...SPECIALS, "smoke"]) {
+      const a = acc[k],
+        on = k === "smoke" || k === specSel;
+      ctx.fillStyle = !a.own
+        ? "rgba(230,238,210,.25)"
+        : on
+          ? k === "smoke"
+            ? "#c8d0c0"
+            : "#ff8a5a"
+          : "rgba(230,238,210,.55)";
+      const label = `${k === "missile" ? "MÍSSIL" : k === "mine" ? "MINA" : "FUMAÇA"} ${a.own ? a.ammo : "-"}`;
+      ctx.fillText(label, ax0, 116);
+      if (on && a.own && k !== "smoke") ctx.fillRect(ax0, 120, ctx.measureText(label).width, 2);
+      ax0 += ctx.measureText(label).width + 14;
+    }
     // canhão / metralhadora
     const cf = 1 - Math.max(0, T.cd) / st.reload;
     ctx.fillStyle = "#000";
@@ -5181,6 +5531,10 @@
   }
   function tUI() {
     if (!T || !LV) return;
+    const sl = `${ACC[specSel].n.toUpperCase()} ${acc[specSel].own ? acc[specSel].ammo : "-"}`,
+      fl = `FUMAÇA ${acc.smoke.own ? acc.smoke.ammo : "-"}`;
+    if ($("tbSpec").textContent !== sl) $("tbSpec").textContent = sl;
+    if ($("tbSmoke").textContent !== fl) $("tbSmoke").textContent = fl;
     const boss = tz.find((z) => z.d.big && !z.dead);
     if (boss) $("bossfill").style.width = Math.max(0, (boss.hp / boss.max) * 100) + "%";
     else if (!$("bossbar").hidden) $("bossbar").hidden = true;
@@ -5188,12 +5542,28 @@
 
   /* ---------- controles: teclado, mouse e tela de toque ---------- */
   // W A S D = andar · setas = torreta · Espaço = canhão · Shift = metralhadora
-  const TANK_KEYS = new Set(["arrowup", "arrowdown", "arrowleft", "arrowright", "w", "a", "s", "d", " ", "shift"]);
+  // E = acessório (míssil/mina) · Q = fumaça · Tab ou roda do mouse = troca o acessório
+  const TANK_KEYS = new Set([
+    "arrowup",
+    "arrowdown",
+    "arrowleft",
+    "arrowright",
+    "w",
+    "a",
+    "s",
+    "d",
+    " ",
+    "shift",
+    "e",
+    "q",
+    "tab",
+  ]);
   function tKey(e, down) {
     const k = e.key.toLowerCase();
     if (!TANK_KEYS.has(k)) return false;
     e.preventDefault();
     if (down) {
+      if (k === "tab" && !e.repeat) cycleSpec(1);
       tkeys.add(k);
       tin.touch = false;
       if (k.startsWith("arrow")) tin.mouse = null;
@@ -5224,6 +5594,15 @@
     if (e.button === 2) tin.mg = false;
   });
   cv.addEventListener("contextmenu", (e) => MODE === "tank" && e.preventDefault());
+  cv.addEventListener(
+    "wheel",
+    (e) => {
+      if (MODE !== "tank" || state !== "play") return;
+      e.preventDefault();
+      cycleSpec(e.deltaY > 0 ? 1 : -1);
+    },
+    { passive: false },
+  );
   // analógicos da tela (esquerdo = andar, direito = torreta)
   function stickCtl(el, key) {
     const knob = el.querySelector("i");
@@ -5263,9 +5642,15 @@
   }
   stickCtl($("joy"), "joy");
   stickCtl($("joy2"), "joy2");
+  $("tbSwap").addEventListener("click", () => {
+    audio();
+    cycleSpec(1);
+  });
   for (const [id, key] of [
     ["tbCannon", "cannon"],
     ["tbMG", "mg"],
+    ["tbSpec", "spec"],
+    ["tbSmoke", "smoke"],
   ]) {
     const b = $(id);
     b.addEventListener("pointerdown", (e) => {

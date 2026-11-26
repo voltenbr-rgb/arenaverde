@@ -19,13 +19,21 @@ O tanque é o **T-90 Bravo** (arte em `public/assets/tank/`), desenhado em camad
 
 Em cada missão, destrua os **ninhos de zumbi** e chegue à **extração** (bandeira no fim do mapa). Tudo pode ser destruído: árvores, cercas e caixas o tanque esmaga passando por cima; barris e carros explodem em cadeia; sacos de areia, pedras, cabanas, torres e prédios caem com o canhão. Caixas e construções podem deixar reparo ou moedas. Entre as missões, a **Oficina** vende melhorias. O progresso, as moedas e as melhorias ficam salvos no aparelho.
 
+Os controles são iguais em todo lugar, no estilo tanque: **frente acelera, trás dá ré sem girar e os lados giram o casco**.
+
 | Ação | PC | Controle PS4 | Celular (tela cheia) |
 | --- | --- | --- | --- |
-| Andar (para a direção apertada) | W A S D | analógico esquerdo (ou direcional) | analógico esquerdo |
-| Torreta | setas ou mouse | analógico direito | analógico direito |
-| Canhão | Espaço ou botão esquerdo do mouse | R2, R1 ou X | botão CANHÃO |
-| Metralhadora | Shift ou botão direito do mouse | L2, L1 ou □ | botão METRALHADORA |
-| Pausa | P ou Esc | OPTIONS | botão II |
+| Frente / ré | W / S | analógico esquerdo ↑ / ↓ | analógico esquerdo ↑ / ↓ |
+| Girar o tanque | A / D | analógico esquerdo ← / → | analógico esquerdo ← / → |
+| Torreta | setas ou mouse | analógico direito (empurrar mais = mira mais longe) | analógico direito |
+| Canhão | Espaço ou clique esquerdo | R2 | CANHÃO |
+| Metralhadora | Shift ou clique direito | R1 | METRALHADORA |
+| Acessório (míssil / mina) | E | L1 | MÍSSIL / MINA |
+| Fumaça | Q | L2 | FUMAÇA |
+| Trocar acessório | Tab ou roda do mouse | direcional ← / → | ⇄ |
+| Pausa | P ou Esc | OPTIONS | II |
+
+**Acessórios:** o **lança-mísseis** fica no teto e o míssil cai onde está a mira (círculo vermelho no chão); as **minas** ficam atrás do tanque; a **fumaça** cria uma nuvem que deixa os zumbis perdidos, sem atacar. Compre na Oficina ou ache nas **caixas azuis** do mapa (a primeira missão tem uma logo no começo).
 
 O código fica na seção `MODO TANQUE` do `game.js`: as missões estão em `MISSIONS`, os temas em `THEMES` e os objetos destrutíveis em `OBJ`.
 

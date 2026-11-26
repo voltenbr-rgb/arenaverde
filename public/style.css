@@ -1136,3 +1136,39 @@ body.tank #rotate {
   color: var(--gold);
   margin: 0 0 10px;
 }
+
+/* botões de acessórios (celular): acima do analógico direito */
+.tbtns2 {
+  position: absolute;
+  right: max(22px, env(safe-area-inset-right));
+  bottom: calc(max(18px, env(safe-area-inset-bottom)) + clamp(120px, 34vmin, 170px) + 12px);
+  display: flex;
+  gap: 8px;
+  pointer-events: auto;
+}
+.tbtns2 button {
+  touch-action: none;
+  font-size: 7px;
+  padding: 8px 8px;
+  min-height: 40px;
+  border-radius: 12px;
+  color: rgba(255, 255, 255, 0.9);
+  text-shadow: 1px 1px 0 #000;
+  background: rgba(255, 255, 255, 0.12);
+  border: 2px solid rgba(255, 255, 255, 0.35);
+}
+#tbSpec {
+  background: rgba(255, 110, 70, 0.25);
+  border-color: rgba(255, 140, 100, 0.6);
+}
+#tbSwap {
+  font-size: 14px;
+  width: 40px;
+  padding: 0;
+}
+.tbtns2 button.on {
+  filter: brightness(1.6);
+}
+.ucard.acc {
+  background: linear-gradient(#2e3f4f, #1f2a35);
+}
