@@ -13,7 +13,7 @@ Cada personagem tem 2 artes, e uma nunca substitui a outra:
 O campo é desenhado em alta resolução, então os sprites ficam nítidos e acompanham o tamanho da casa (cerca de 64 px no celular deitado e 80–110 px no PC). Cada sprite tem 2 frames: **parado** (respirando) e **atacando** (recuo). Os zumbis têm frames de andar e de morder.
 
 ## Modo Tanque (campanha)
-No menu, **MODO TANQUE** abre a **Garagem**, onde você escolhe a camuflagem, o canhão e o chassi. A campanha tem **5 missões** em mapas compridos, com a câmera seguindo o tanque:
+O tanque é o **T-90 Bravo** (arte em `public/assets/tank/`), desenhado em camadas para girar 360°. No menu, **MODO TANQUE** abre a **Garagem**, onde você escolhe a camuflagem, o canhão e o chassi. A campanha tem **5 missões** em mapas compridos, com a câmera seguindo o tanque:
 
 1. Saída da Base · 2. Floresta Densa · 3. Deserto Queimado · 4. Cidade em Ruínas · 5. Fortaleza Zumbi (com o Chefão)
 
@@ -21,10 +21,10 @@ Em cada missão, destrua os **ninhos de zumbi** e chegue à **extração** (band
 
 | Ação | PC | Controle PS4 | Celular (tela cheia) |
 | --- | --- | --- | --- |
-| Andar / girar | ↑ ↓ ← → | analógico esquerdo (ou direcional) | analógico esquerdo |
-| Torreta | A / D ou mouse | analógico direito | analógico direito |
-| Canhão | Espaço, B ou clique | R2, R1 ou X | botão CANHÃO |
-| Metralhadora | Enter (segure) | L2, L1 ou □ | botão METRALHADORA |
+| Andar (para a direção apertada) | W A S D | analógico esquerdo (ou direcional) | analógico esquerdo |
+| Torreta | setas ou mouse | analógico direito | analógico direito |
+| Canhão | Espaço ou botão esquerdo do mouse | R2, R1 ou X | botão CANHÃO |
+| Metralhadora | Shift ou botão direito do mouse | L2, L1 ou □ | botão METRALHADORA |
 | Pausa | P ou Esc | OPTIONS | botão II |
 
 O código fica na seção `MODO TANQUE` do `game.js`: as missões estão em `MISSIONS`, os temas em `THEMES` e os objetos destrutíveis em `OBJ`.

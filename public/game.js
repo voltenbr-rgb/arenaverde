@@ -3220,6 +3220,7 @@
      Celular: tela cheia, analógico esquerdo anda, direito gira a torreta, botões de tiro.
      ========================================================================== */
   const CAMO = {
+    bravo: { n: "Bravo", base: "#b39a63", side: "#7a6842", dark: "#4a4030", blobs: ["#5f5e34", "#25241c", "#d0b980"] },
     verde: { n: "Verde", base: "#5b7530", side: "#2f3f18", dark: "#3d521f", blobs: ["#41571f", "#7a9442", "#2a3814"] },
     deserto: {
       n: "Deserto",
@@ -3290,7 +3291,7 @@
   ];
   const UPG_COST = [80, 140, 220];
   const REPAIR_COST = 60;
-  let tcfg = Object.assign({ camo: "verde", cannon: "padrao", chassis: "medio" }, store.get("tank") || {});
+  let tcfg = Object.assign({ camo: "bravo", cannon: "padrao", chassis: "medio" }, store.get("tank") || {});
   let tankBest = +(store.get("tankBest") || 0);
   const tkeys = new Set();
   const tin = { joy: null, joy2: null, cannon: false, mg: false, touch: false, mouse: null };
@@ -3299,8 +3300,16 @@
   {
     let sd = 5;
     const r = () => (sd = (sd * 9301 + 49297) % 233280) / 233280;
-    for (let i = 0; i < 11; i++)
-      BLOBS.push({ x: r() * 2 - 1, y: r() * 2 - 1, rx: 2 + r() * 3.5, ry: 1.4 + r() * 2.4, a: r() * 3, c: i % 3 });
+    // manchas angulares (camuflagem geométrica)
+    for (let i = 0; i < 26; i++) {
+      const n = 4 + ((r() * 2) | 0),
+        pts = [];
+      for (let k = 0; k < n; k++) {
+        const a = (k / n) * 6.283 + r() * 0.8;
+        pts.push([Math.cos(a) * (0.6 + r() * 0.6), Math.sin(a) * (0.6 + r() * 0.6)]);
+      }
+      BLOBS.push({ x: r() * 2.2 - 1.1, y: r() * 2.2 - 1.1, rx: 3 + r() * 4, ry: 2 + r() * 3, pts, c: i % 3 });
+    }
   }
   const angDiff = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
   const turnTo = (a, target, max) => {
@@ -3332,112 +3341,214 @@
     c.fill();
   }
   // M = matriz do chão (grade -> pixels), hk = pixels por unidade de altura
+  /* Tanque T-90 BRAVO desenhado em camadas (gira 360°).
+     Peças: esteiras, casco com saias laterais blindadas, grade do motor, torre angular
+     com cesto traseiro, lançadores de fumaça, miras, metralhadora remota (RCWS),
+     antenas e canhão longo com extrator de fumaça. M = matriz do chão, hk = px por unidade de altura. */
   function drawTank(c, M, hk, t, cfg, fl = 0) {
     const ch = CHASSIS[cfg.chassis],
       cn = CANNON[cfg.cannon],
       cm = CAMO[cfg.camo],
       L = ch.L,
       W = ch.W,
-      tw = 5;
+      tw = 4.6;
     const lay = (h) => {
       c.setTransform(M[0], M[1], M[2], M[3], M[4], M[5] - h * hk);
       c.translate(t.x, t.y);
       c.rotate(t.ang);
     };
-    const R = W * 0.37,
-      px = -2;
+    const R = W * 0.35,
+      px = -2.5;
     const tur = (h) => {
       lay(h);
       c.translate(px, 0);
       c.rotate(t.tur - t.ang);
     };
+    // ponto local da torreta -> tela (para antenas, que ficam em pé)
+    const turToScreen = (lx, ly, h) => {
+      const ra = t.tur,
+        wx = t.x + Math.cos(t.ang) * px + Math.cos(ra) * lx - Math.sin(ra) * ly,
+        wy = t.y + Math.sin(t.ang) * px + Math.sin(ra) * lx + Math.cos(ra) * ly;
+      return [M[0] * wx + M[2] * wy + M[4], M[1] * wx + M[3] * wy + M[5] - h * hk];
+    };
+    const poly = (pts) => {
+      c.beginPath();
+      for (const [x, y] of pts) c.lineTo(x, y);
+      c.closePath();
+      c.fill();
+    };
+    // manchas geométricas da camuflagem, recortadas numa forma
+    const camo = (shape, sc, shift) => {
+      c.save();
+      shape();
+      c.clip();
+      for (const b of BLOBS) {
+        c.fillStyle = cm.blobs[(b.c + shift) % 3];
+        const cx = b.x * sc[0],
+          cy = b.y * sc[1];
+        poly(b.pts.map(([x, y]) => [cx + x * b.rx, cy + y * b.ry]));
+      }
+      c.restore();
+    };
     c.save();
     // sombra
     lay(0);
-    c.fillStyle = "rgba(0,0,0,.32)";
+    c.fillStyle = "rgba(0,0,0,.34)";
     c.beginPath();
-    c.ellipse(1.5, 1.5, L / 2 + 4, W / 2 + 4, 0, 0, 7);
+    c.ellipse(2, 2, L / 2 + 5, W / 2 + 4, 0, 0, 7);
     c.fill();
     // esteiras
-    for (let h = 0; h <= 3; h += 0.5) {
+    for (let h = 0; h <= 2.5; h += 0.5) {
       lay(h);
-      c.fillStyle = h < 3 ? "#13170b" : "#2b3021";
-      for (const s of [-1, 1]) c.fillRect(-L / 2, s * (W / 2 - tw / 2) - tw / 2, L, tw);
+      c.fillStyle = h < 2.5 ? "#121510" : "#2a2d22";
+      for (const s of [-1, 1]) c.fillRect(-L / 2 - 1, s * (W / 2 - tw / 2) - tw / 2, L + 2, tw);
     }
-    lay(3);
-    c.fillStyle = "#4b513d";
+    lay(2.5);
+    c.fillStyle = "#4a4d3e";
     for (const s of [-1, 1])
-      for (let i = 0; i < L; i += 3) {
-        const x = -L / 2 + ((((i + t.phase) % L) + L) % L);
-        c.fillRect(x, s * (W / 2 - tw / 2) - tw / 2, 1, tw);
+      for (let i = 0; i < L + 2; i += 2.2) {
+        const x = -L / 2 - 1 + ((((i + t.phase) % (L + 2)) + L + 2) % (L + 2));
+        c.fillRect(x, s * (W / 2 - tw / 2) - tw / 2, 0.8, tw);
       }
+    // saias laterais blindadas (painéis)
+    for (let h = 2.5; h <= 6; h += 0.5) {
+      lay(h);
+      c.fillStyle = h < 6 ? cm.side : cm.base;
+      for (const s of [-1, 1]) c.fillRect(-L / 2 + 0.5, s * (W / 2 - 1) - 1, L - 1, 2);
+    }
+    lay(6);
+    camo(
+      () => {
+        c.beginPath();
+        for (const sg of [-1, 1]) c.rect(-L / 2 + 0.5, sg * (W / 2 - 1) - 1, L - 1, 2);
+      },
+      [L / 2, W / 2],
+      2,
+    );
+    c.fillStyle = "rgba(0,0,0,.45)";
+    for (const s of [-1, 1]) for (let x = -L / 2 + 4; x < L / 2; x += 4) c.fillRect(x, s * (W / 2 - 1) - 1, 0.5, 2);
     // casco
+    const hullShape = () => {
+      c.beginPath();
+      c.moveTo(-L / 2 + 0.5, -W / 2 + 2);
+      c.lineTo(L / 2 - 3, -W / 2 + 2);
+      c.lineTo(L / 2, -W / 2 + 4.5);
+      c.lineTo(L / 2, W / 2 - 4.5);
+      c.lineTo(L / 2 - 3, W / 2 - 2);
+      c.lineTo(-L / 2 + 0.5, W / 2 - 2);
+      c.closePath();
+    };
     for (let h = 3; h <= 7; h += 0.5) {
       lay(h);
       c.fillStyle = h < 7 ? cm.side : cm.base;
-      c.fillRect(-L / 2 + 1, -W / 2 + 1.5, L - 2, W - 3);
+      hullShape();
+      c.fill();
     }
     lay(7);
-    c.save();
-    c.beginPath();
-    c.rect(-L / 2 + 1, -W / 2 + 1.5, L - 2, W - 3);
-    c.clip();
-    for (const b of BLOBS) {
-      c.fillStyle = cm.blobs[b.c];
-      c.beginPath();
-      c.ellipse((b.x * L) / 2, (b.y * W) / 2, b.rx, b.ry, b.a, 0, 7);
-      c.fill();
-    }
-    c.restore();
-    c.fillStyle = "rgba(255,255,255,.18)";
-    c.fillRect(L / 2 - 4, -W / 2 + 1.5, 2.5, W - 3); // placa frontal
-    c.fillStyle = "rgba(0,0,0,.3)";
-    for (let i = 0; i < 4; i++) c.fillRect(-L / 2 + 2 + i * 1.6, -W / 2 + 4, 0.8, W - 8); // grade do motor
-    c.fillStyle = "#f4e7a2";
-    c.fillRect(L / 2 - 2, -W / 2 + 2, 1.4, 2);
-    c.fillRect(L / 2 - 2, W / 2 - 4, 1.4, 2);
+    camo(hullShape, [L / 2, W / 2], 0);
+    // grade do motor (traseira) e rebites
+    c.fillStyle = "rgba(10,10,6,.6)";
+    c.fillRect(-L / 2 + 1.5, -W / 2 + 4, 6.5, W - 8);
+    c.fillStyle = "rgba(255,255,255,.12)";
+    for (let i = 0; i < 6; i++) c.fillRect(-L / 2 + 2 + i * 1.05, -W / 2 + 4.5, 0.4, W - 9);
+    c.fillStyle = "rgba(255,255,255,.2)";
+    c.fillRect(L / 2 - 3.2, -W / 2 + 4, 1.4, W - 8); // placa frontal iluminada
+    c.fillStyle = "#e8e0a8";
+    c.fillRect(L / 2 - 1.4, -W / 2 + 3, 1, 1.6);
+    c.fillRect(L / 2 - 1.4, W / 2 - 4.6, 1, 1.6);
+    c.fillStyle = "#3a3524";
+    c.fillRect(L / 2 - 6, W / 2 - 6, 3, 2); // caixa de ferramentas
     if (fl > 0) {
       c.fillStyle = `rgba(255,70,50,${Math.min(0.35, fl * 5)})`;
-      c.fillRect(-L / 2 + 1, -W / 2 + 1.5, L - 2, W - 3);
-    }
-    // torreta
-    for (let h = 7; h <= 11; h += 0.5) {
-      tur(h);
-      c.fillStyle = h < 11 ? cm.side : cm.base;
-      oct(c, R * 1.15, R);
-    }
-    tur(11);
-    c.save();
-    oct(c, R * 1.15, R);
-    c.clip();
-    for (const b of BLOBS) {
-      c.fillStyle = cm.blobs[(b.c + 1) % 3];
-      c.beginPath();
-      c.ellipse(b.x * R, b.y * R, b.rx * 0.6, b.ry * 0.6, b.a, 0, 7);
+      hullShape();
       c.fill();
     }
-    c.restore();
+    // torre angular com cesto traseiro
+    const turShape = () => {
+      c.beginPath();
+      c.moveTo(-R * 1.45, -R * 0.7);
+      c.lineTo(-R * 0.3, -R * 0.95);
+      c.lineTo(R * 0.75, -R * 0.85);
+      c.lineTo(R * 1.25, -R * 0.3);
+      c.lineTo(R * 1.25, R * 0.3);
+      c.lineTo(R * 0.75, R * 0.85);
+      c.lineTo(-R * 0.3, R * 0.95);
+      c.lineTo(-R * 1.45, R * 0.7);
+      c.closePath();
+    };
+    for (let h = 7; h <= 11.5; h += 0.5) {
+      tur(h);
+      c.fillStyle = h < 11.5 ? (h < 8.5 ? cm.dark : cm.side) : cm.base;
+      turShape();
+      c.fill();
+    }
+    tur(11.5);
+    camo(turShape, [R * 1.2, R * 0.9], 1);
+    // escotilha do comandante e miras
     c.fillStyle = cm.dark;
     c.beginPath();
-    c.arc(-R * 0.35, R * 0.3, R * 0.32, 0, 7); // escotilha
+    c.arc(-R * 0.35, R * 0.35, R * 0.33, 0, 7);
     c.fill();
-    // canhão (recua ao atirar)
-    const rec = Math.max(0, t.rec || 0) * 12;
+    c.fillStyle = "rgba(0,0,0,.35)";
+    c.beginPath();
+    c.arc(-R * 0.35, R * 0.35, R * 0.2, 0, 7);
+    c.fill();
+    c.fillStyle = "#2a2a22";
+    c.fillRect(R * 0.35, -R * 0.75, 2.4, 2);
+    c.fillStyle = "#4fe3d0";
+    c.fillRect(R * 0.35 + 1.9, -R * 0.7, 0.6, 1.2); // lente da mira
+    // lançadores de fumaça nas laterais
+    c.fillStyle = "#1b1c16";
+    for (const s of [-1, 1])
+      for (let i = 0; i < 3; i++) {
+        c.beginPath();
+        c.arc(R * 0.55 - i * 1.4, s * R * 0.98, 0.65, 0, 7);
+        c.fill();
+      }
+    // canhão longo (recua ao atirar): tubo, extrator de fumaça e freio de boca
+    const rec = Math.max(0, t.rec || 0) * 12,
+      bx = R * 1.1 - rec,
+      blen = cn.len + 6;
     for (let h = 9; h <= 10.5; h += 0.5) {
       tur(h);
       c.fillStyle = h < 10.5 ? "#141a0c" : cm.dark;
-      c.fillRect(R * 0.85 - rec, -cn.w / 2, cn.len, cn.w);
+      c.fillRect(bx, -cn.w / 2, blen, cn.w);
+      c.fillStyle = h < 10.5 ? "#141a0c" : cm.base;
+      c.fillRect(bx + blen * 0.38, -cn.w / 2 - 0.5, blen * 0.2, cn.w + 1); // extrator de fumaça
       c.fillStyle = "#141a0c";
-      c.fillRect(R * 0.85 - rec + cn.len - 2.6, -cn.w / 2 - 0.8, 3, cn.w + 1.6); // freio de boca
+      c.fillRect(bx + blen - 2.4, -cn.w / 2 - 0.6, 2.8, cn.w + 1.2); // freio de boca
     }
-    // metralhadora no teto da torreta
-    tur(11.6);
-    c.fillStyle = "#1a1d14";
-    c.fillRect(0, -R * 0.6, 3, 2);
-    c.fillRect(2, -R * 0.6 + 0.6, 9, 0.9);
+    tur(10.5);
+    c.fillStyle = cm.blobs[1];
+    c.fillRect(bx + blen * 0.12, -cn.w / 2, 2, cn.w);
+    c.fillRect(bx + blen * 0.7, -cn.w / 2, 1.6, cn.w);
+    // metralhadora remota (RCWS) no teto
+    for (let h = 11.5; h <= 13.5; h += 0.5) {
+      tur(h);
+      c.fillStyle = h < 13.5 ? "#1d1f17" : "#3a3c30";
+      c.fillRect(-R * 0.1, -R * 0.62, 3.2, 2.6);
+    }
+    tur(13.2);
+    c.fillStyle = "#15160f";
+    c.fillRect(-R * 0.1 + 2.5, -R * 0.62 + 0.9, 9, 0.9);
+    c.fillStyle = "#4fe3d0";
+    c.fillRect(-R * 0.1 + 2.6, -R * 0.62 + 2.1, 0.5, 0.5);
+    // antenas (em pé, na tela)
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.strokeStyle = "rgba(20,20,14,.9)";
+    c.lineWidth = Math.max(1, hk * 0.25);
+    for (const [lx, ly] of [
+      [-R * 1.25, -R * 0.55],
+      [-R * 1.25, R * 0.55],
+    ]) {
+      const [sx, sy] = turToScreen(lx, ly, 11.5);
+      c.beginPath();
+      c.moveTo(sx, sy);
+      c.lineTo(sx + hk * 0.5, sy - 15 * hk);
+      c.stroke();
+    }
     c.restore();
   }
-
   let engine = null;
   function engineOn() {
     try {
@@ -3859,13 +3970,13 @@
     const ch = CHASSIS[tcfg.chassis],
       cn = CANNON[tcfg.cannon],
       m = Math.min(camp.m, MISSIONS.length - 1);
-    showOv(`<h2 class="title" style="font-size:clamp(22px,5vw,40px)">GARAGEM</h2><p class="sub">Campanha · Missão ${m + 1}/${MISSIONS.length}: ${MISSIONS[m].n}</p>
+    showOv(`<h2 class="title" style="font-size:clamp(22px,5vw,40px)">GARAGEM</h2><img class="tart" src="assets/tank/bravo.jpg" alt="Tanque T-90 Bravo"><p class="tname">T-90 BRAVO · TANQUE DE GUERRA</p><p class="sub">Campanha · Missão ${m + 1}/${MISSIONS.length}: ${MISSIONS[m].n}</p>
  <canvas id="tprev" width="560" height="300"></canvas>
  <div class="tstats"><span>VIDA <b>${ch.hp}</b></span><span>VELOC. <b>${ch.speed}</b></span><span>DANO <b>${cn.dmg}</b></span><span>RECARGA <b>${cn.reload}s</b></span><span>MOEDAS <b>${camp.money}</b></span></div>
  ${optRow("CAMUFLAGEM", "camo", CAMO)}
  ${optRow("CANHÃO", "cannon", CANNON, (o) => o.desc)}
  ${optRow("CHASSI", "chassis", CHASSIS, (o) => o.desc)}
- <p class="hint">PC: ↑↓ anda · ←→ gira · A/D torreta (ou mouse) · ESPAÇO/B canhão · ENTER metralhadora<br>Controle (PS4): analógico esquerdo anda · direito mira · R2/R1/X canhão · L2/L1/□ metralhadora · OPTIONS pausa<br>Celular: tela cheia, analógico esquerdo anda e direito gira a torreta</p>
+ <p class="hint">PC: W A S D anda · setas ou mouse giram a torreta · ESPAÇO ou botão esquerdo = canhão · SHIFT ou botão direito = metralhadora<br>Controle (PS4): analógico esquerdo anda · direito mira · R2/R1/X canhão · L2/L1/□ metralhadora · OPTIONS pausa<br>Celular: tela cheia, analógico esquerdo anda e direito gira a torreta</p>
  <button class="big" data-a="tgo">${camp.m > 0 ? "CONTINUAR CAMPANHA ▶" : "INICIAR CAMPANHA ▶"}</button>${camp.m > 0 ? '<button class="alt" data-a="treset">RECOMEÇAR</button>' : ""}<button class="alt" data-a="menu">VOLTAR</button>`);
     drawPreview(0);
   }
@@ -3873,7 +3984,7 @@
     const c = $("tprev");
     if (!c) return;
     const x = c.getContext("2d"),
-      s = 5.4;
+      s = 6.6;
     x.setTransform(1, 0, 0, 1, 0, 0);
     x.clearRect(0, 0, c.width, c.height);
     const g = x.createRadialGradient(280, 175, 20, 280, 175, 260);
@@ -3881,7 +3992,7 @@
     g.addColorStop(1, "#22331a");
     x.fillStyle = g;
     x.fillRect(0, 0, c.width, c.height);
-    const M = [s * 0.95, -s * 0.52, s * 0.95, s * 0.52, 280, 190];
+    const M = [s * 0.95, -s * 0.52, s * 0.95, s * 0.52, 270, 205];
     drawTank(
       x,
       M,
@@ -4238,9 +4349,13 @@
   function tUpdate(dt) {
     const st = tStats();
     // --- movimento: teclado, controle ou analógico da tela
-    let fwd = (tkeys.has("arrowup") || pad.up ? 1 : 0) - (tkeys.has("arrowdown") || pad.down ? 1 : 0),
-      rot = (tkeys.has("arrowright") || pad.right ? 1 : 0) - (tkeys.has("arrowleft") || pad.left ? 1 : 0);
-    const stick = tin.joy || (pad.lx || pad.ly ? { x: pad.lx, y: pad.ly } : null);
+    // WASD (e o direcional do controle) apontam a direção na tela, como o analógico:
+    // o tanque gira para lá e anda
+    let fwd = 0,
+      rot = 0;
+    const kx = (tkeys.has("d") || pad.right ? 1 : 0) - (tkeys.has("a") || pad.left ? 1 : 0),
+      ky = (tkeys.has("s") || pad.down ? 1 : 0) - (tkeys.has("w") || pad.up ? 1 : 0);
+    const stick = tin.joy || (pad.lx || pad.ly ? { x: pad.lx, y: pad.ly } : kx || ky ? { x: kx, y: ky } : null);
     if (stick) {
       // o casco gira para a direção apontada na tela e anda para frente
       const m = Math.min(1, Math.hypot(stick.x, stick.y));
@@ -4285,18 +4400,20 @@
       engine.o.frequency.setTargetAtTime(36 + 34 * f, AC.currentTime, 0.1);
     }
     // --- torreta: A/D, analógico direito (tela ou controle) ou mouse
-    const tr = (tkeys.has("d") ? 1 : 0) - (tkeys.has("a") ? 1 : 0),
-      aim = tin.joy2 || (Math.hypot(pad.rx, pad.ry) > 0.3 ? { x: pad.rx, y: pad.ry } : null);
-    if (tr) T.tur += tr * 2.8 * dt;
-    else if (aim && Math.hypot(aim.x, aim.y) > 0.25) T.tur = turnTo(T.tur, screenToGroundDir(aim.x, aim.y), 5 * dt);
+    // torreta: setas (direção na tela), analógico direito (tela ou controle) ou mouse
+    const ax = (tkeys.has("arrowright") ? 1 : 0) - (tkeys.has("arrowleft") ? 1 : 0),
+      ay = (tkeys.has("arrowdown") ? 1 : 0) - (tkeys.has("arrowup") ? 1 : 0),
+      aim =
+        tin.joy2 || (Math.hypot(pad.rx, pad.ry) > 0.3 ? { x: pad.rx, y: pad.ry } : ax || ay ? { x: ax, y: ay } : null);
+    if (aim && Math.hypot(aim.x, aim.y) > 0.25) T.tur = turnTo(T.tur, screenToGroundDir(aim.x, aim.y), 4.5 * dt);
     else if (tin.mouse) T.tur = turnTo(T.tur, Math.atan2(tin.mouse.y - T.y, tin.mouse.x - T.x), 4 * dt);
     // --- armas
     T.cd -= dt;
     T.mgCd -= dt;
     T.rec = Math.max(0, T.rec - dt);
     T.fl = Math.max(0, T.fl - dt);
-    const wantCannon = tin.cannon || pad.cannon || tkeys.has(" ") || tkeys.has("b"),
-      wantMG = tin.mg || pad.mg || tkeys.has("enter");
+    const wantCannon = tin.cannon || pad.cannon || tkeys.has(" "),
+      wantMG = tin.mg || pad.mg || tkeys.has("shift");
     if (wantCannon && T.cd <= 0) fireCannon(st);
     if (wantMG && !T.over && T.mgCd <= 0) fireMG(st);
     T.heat = Math.max(0, T.heat - dt * (wantMG && !T.over ? 0.05 : 0.38));
@@ -5070,7 +5187,8 @@
   }
 
   /* ---------- controles: teclado, mouse e tela de toque ---------- */
-  const TANK_KEYS = new Set(["arrowup", "arrowdown", "arrowleft", "arrowright", "a", "d", " ", "b", "enter"]);
+  // W A S D = andar · setas = torreta · Espaço = canhão · Shift = metralhadora
+  const TANK_KEYS = new Set(["arrowup", "arrowdown", "arrowleft", "arrowright", "w", "a", "s", "d", " ", "shift"]);
   function tKey(e, down) {
     const k = e.key.toLowerCase();
     if (!TANK_KEYS.has(k)) return false;
@@ -5078,7 +5196,7 @@
     if (down) {
       tkeys.add(k);
       tin.touch = false;
-      if (k === "a" || k === "d") tin.mouse = null;
+      if (k.startsWith("arrow")) tin.mouse = null;
     } else tkeys.delete(k);
     return true;
   }
@@ -5094,13 +5212,18 @@
     tin.mouse = wunproject(sx, sy);
     tin.touch = false;
   });
+  // mouse: botão esquerdo = canhão, botão direito = metralhadora
   cv.addEventListener("pointerdown", (e) => {
-    if (MODE !== "tank" || state !== "play") return;
-    if (e.pointerType === "mouse") tin.cannon = true;
+    if (MODE !== "tank" || state !== "play" || e.pointerType !== "mouse") return;
+    if (e.button === 0) tin.cannon = true;
+    if (e.button === 2) tin.mg = true;
   });
   addEventListener("pointerup", (e) => {
-    if (MODE === "tank" && e.pointerType === "mouse") tin.cannon = false;
+    if (MODE !== "tank" || e.pointerType !== "mouse") return;
+    if (e.button === 0) tin.cannon = false;
+    if (e.button === 2) tin.mg = false;
   });
+  cv.addEventListener("contextmenu", (e) => MODE === "tank" && e.preventDefault());
   // analógicos da tela (esquerdo = andar, direito = torreta)
   function stickCtl(el, key) {
     const knob = el.querySelector("i");

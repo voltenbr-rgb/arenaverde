@@ -1122,3 +1122,17 @@ body.tank #rotate {
   font-size: 12px;
   letter-spacing: 2px;
 }
+
+.tart {
+  width: 100%;
+  max-width: 560px;
+  display: block;
+  margin: 4px auto 6px;
+  border: 3px solid var(--dark);
+  box-shadow: 0 0 0 2px var(--edge);
+}
+.tname {
+  font-size: 10px;
+  color: var(--gold);
+  margin: 0 0 10px;
+}
