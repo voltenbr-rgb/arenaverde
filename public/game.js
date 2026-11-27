@@ -4514,8 +4514,8 @@
   let acc = accDefault(),
     specSel = "missile",
     specSel2 = "missile",
-    accCd = { missile: 0, heavy: 0, mine: 0, smoke: 0 },
-    accCd2 = { missile: 0, heavy: 0, mine: 0, smoke: 0 },
+    accCd = { missile: 0, heavy: 0, mortar: 0, flame: 0, shock: 0, mine: 0, smoke: 0 },
+    accCd2 = { missile: 0, heavy: 0, mortar: 0, flame: 0, shock: 0, mine: 0, smoke: 0 },
     tmines = [],
     clouds = [],
     aimDist = 170;
