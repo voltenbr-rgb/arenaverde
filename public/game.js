@@ -3950,6 +3950,11 @@
   }
   function tStart() {
     MODE = "tank";
+    // Cada missão tem sua própria sequência de rádio; as comunicações voltam na fase seguinte.
+    if (radioCurrent) { radioCurrent.pause(); radioCurrent = null; }
+    radioQueue = [];
+    radioIndex = 0;
+    radioSeen.clear();
     document.body.classList.add("tank");
     reset();
     $("banner").classList.remove("show");
