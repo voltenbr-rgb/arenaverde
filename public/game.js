@@ -3284,6 +3284,7 @@
     leve: { n: "Leve", hp: 260, speed: 62, turn: 2.7, L: 26, W: 17, desc: "Rápido, pouca blindagem" },
     medio: { n: "Médio", hp: 360, speed: 48, turn: 2.2, L: 29, W: 19, desc: "Equilibrado" },
     pesado: { n: "Pesado", hp: 520, speed: 36, turn: 1.8, L: 32, W: 21, desc: "Muita blindagem, lento" },
+    abrams: { n: "M1 Abrams", hp: 620, speed: 44, turn: 2.0, L: 34, W: 22, desc: "Tanque de batalha americano · blindagem pesada e alta mobilidade" },
   };
   // melhorias compradas na oficina entre as ondas (valem só na partida)
   const UPG = [
@@ -3436,12 +3437,21 @@
     // casco
     const hullShape = () => {
       c.beginPath();
-      c.moveTo(-L / 2 + 0.5, -W / 2 + 2);
-      c.lineTo(L / 2 - 3, -W / 2 + 2);
-      c.lineTo(L / 2, -W / 2 + 4.5);
-      c.lineTo(L / 2, W / 2 - 4.5);
-      c.lineTo(L / 2 - 3, W / 2 - 2);
-      c.lineTo(-L / 2 + 0.5, W / 2 - 2);
+      if (cfg.chassis === "abrams") {
+        c.moveTo(-L / 2 + 1, -W / 2 + 2);
+        c.lineTo(L / 2 - 7, -W / 2 + 2);
+        c.lineTo(L / 2, -W / 2 + 6);
+        c.lineTo(L / 2, W / 2 - 6);
+        c.lineTo(L / 2 - 7, W / 2 - 2);
+        c.lineTo(-L / 2 + 1, W / 2 - 2);
+      } else {
+        c.moveTo(-L / 2 + 0.5, -W / 2 + 2);
+        c.lineTo(L / 2 - 3, -W / 2 + 2);
+        c.lineTo(L / 2, -W / 2 + 4.5);
+        c.lineTo(L / 2, W / 2 - 4.5);
+        c.lineTo(L / 2 - 3, W / 2 - 2);
+        c.lineTo(-L / 2 + 0.5, W / 2 - 2);
+      }
       c.closePath();
     };
     for (let h = 3; h <= 7; h += 0.5) {
@@ -3472,14 +3482,25 @@
     // torre angular com cesto traseiro
     const turShape = () => {
       c.beginPath();
-      c.moveTo(-R * 1.45, -R * 0.7);
-      c.lineTo(-R * 0.3, -R * 0.95);
-      c.lineTo(R * 0.75, -R * 0.85);
-      c.lineTo(R * 1.25, -R * 0.3);
-      c.lineTo(R * 1.25, R * 0.3);
-      c.lineTo(R * 0.75, R * 0.85);
-      c.lineTo(-R * 0.3, R * 0.95);
-      c.lineTo(-R * 1.45, R * 0.7);
+      if (cfg.chassis === "abrams") {
+        c.moveTo(-R * 1.5, -R * 0.72);
+        c.lineTo(-R * 0.95, -R * 1.02);
+        c.lineTo(R * 0.72, -R * 0.92);
+        c.lineTo(R * 1.42, -R * 0.48);
+        c.lineTo(R * 1.42, R * 0.48);
+        c.lineTo(R * 0.72, R * 0.92);
+        c.lineTo(-R * 0.95, R * 1.02);
+        c.lineTo(-R * 1.5, R * 0.72);
+      } else {
+        c.moveTo(-R * 1.45, -R * 0.7);
+        c.lineTo(-R * 0.3, -R * 0.95);
+        c.lineTo(R * 0.75, -R * 0.85);
+        c.lineTo(R * 1.25, -R * 0.3);
+        c.lineTo(R * 1.25, R * 0.3);
+        c.lineTo(R * 0.75, R * 0.85);
+        c.lineTo(-R * 0.3, R * 0.95);
+        c.lineTo(-R * 1.45, R * 0.7);
+      }
       c.closePath();
     };
     for (let h = 7; h <= 11.5; h += 0.5) {
@@ -3490,6 +3511,17 @@
     }
     tur(11.5);
     camo(turShape, [R * 1.2, R * 0.9], 1);
+    // cesta traseira alongada característica da torre do M1 Abrams
+    if (cfg.chassis === "abrams") {
+      tur(9.5);
+      c.fillStyle = cm.side;
+      c.fillRect(-R * 1.62, -R * 0.48, R * 0.58, R * 0.96);
+      c.strokeStyle = "rgba(15,18,12,.7)";
+      c.lineWidth = 0.8;
+      c.strokeRect(-R * 1.62, -R * 0.48, R * 0.58, R * 0.96);
+      c.fillStyle = "rgba(0,0,0,.28)";
+      for (let j = 0; j < 4; j++) c.fillRect(-R * 1.53 + j * R * 0.12, -R * 0.4, 0.6, R * 0.8);
+    }
     // escotilha do comandante e miras
     c.fillStyle = cm.dark;
     c.beginPath();
