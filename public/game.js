@@ -757,7 +757,7 @@
     const a = new Audio(src);
     radioCurrent = a;
     a.preload = "auto";
-    a.volume = 0.24;
+    a.volume = 0.32;
     a.muted = !sound;
     const finish = () => {
       if (radioCurrent === a) radioCurrent = null;
@@ -3985,6 +3985,9 @@
     tdrops = [];
     tdec = [];
     for (const a of LV.arms) tdrops.push({ x: a.x, y: a.y, kind: "arm", t: 0, life: 1e9 });
+    // Um lançador pesado de mísseis fica disponível no terreno em cada missão.
+    const launcherX = LV.L * 0.52;
+    tdrops.push({ x: launcherX, y: roadY(launcherX) + 24, kind: "launcher", t: 0, life: 1e9 });
     acc = cloneAcc(camp.acc);
     if (!acc[specSel].own) specSel = SPECIALS.find((k) => acc[k].own) || "missile";
     tmines = [];
@@ -5050,11 +5053,19 @@
       c.t += dt;
       c.life -= dt;
       const collector = T2&&T2.hp>0&&Math.hypot(c.x-T2.x,c.y-T2.y)<Math.hypot(c.x-T.x,c.y-T.y)?T2:T;
-      if (Math.hypot(c.x-collector.x,c.y-collector.y)<18) {
+      if (Math.hypot(c.x-collector.x,c.y-collector.y)<(c.kind === "launcher" ? 27 : 18)) {
         c.life = 0;
         const [a, b] = P(c.x, c.y, 6);
         G(GL.y, a, b, { r0: 4, r1: 16, life: 0.3 });
-        if (c.kind === "arm") pickArmCrate();
+        if (c.kind === "launcher") {
+          acc.missile.own = true;
+          acc.missile.ammo = Math.min(ACC.missile.max, Math.max(acc.missile.ammo, 0) + 4);
+          specSel = "missile";
+          if (T) T.pod = true;
+          if (T2) T2.pod = true;
+          txt(a, b - 12, "LANÇADOR DE MÍSSEIS +4", "255,214,90");
+          banner("LANÇADOR PESADO EQUIPADO!", 1.8);
+        } else if (c.kind === "arm") pickArmCrate();
         else if (c.kind === "rep") {
           collector.hp = Math.min(st.max, collector.hp + st.max * 0.2);
           txt(a, b - 8, "REPARO +20%", "140,235,90");
@@ -5490,10 +5501,24 @@
         if (c.life < 3 && ((c.life * 8) | 0) % 2) return;
         scr();
         const [sx, sy] = wiso(c.x, c.y);
-        shadow(sx, sy, 6 * K);
+        shadow(sx, sy, c.kind === "launcher" ? 15 * K : 6 * K);
         ctx.save();
-        ctx.translate(sx, sy - Math.abs(Math.sin(c.t * 3)) * 3 * K);
+        ctx.translate(sx, sy - Math.abs(Math.sin(c.t * 3)) * (c.kind === "launcher" ? 5 : 3) * K);
         ctx.scale(K, K);
+        if (c.kind === "launcher") {
+          // Caixa grande com dois tubos de míssil, visível no chão antes da coleta.
+          ctx.fillStyle = "#171b16"; ctx.fillRect(-13, -16, 27, 16);
+          ctx.fillStyle = "#6b7655"; ctx.fillRect(-12, -15, 25, 13);
+          ctx.fillStyle = "#30382b"; ctx.fillRect(-10, -20, 20, 7);
+          for (const oy of [-16, -10]) {
+            ctx.fillStyle = "#151a17"; ctx.fillRect(-8, oy, 16, 4);
+            ctx.fillStyle = "#aab39a"; ctx.fillRect(-6, oy + 1, 11, 1);
+            ctx.fillStyle = "#d7a64b"; ctx.fillRect(5, oy, 2, 4);
+          }
+          ctx.fillStyle = "#f2c230"; ctx.fillRect(-12, -3, 25, 2);
+          ctx.restore();
+          return;
+        }
         ctx.fillStyle = "#141a0e";
         ctx.fillRect(-5, -9, 11, 9);
         ctx.fillStyle = c.kind === "arm" ? "#3a5a8a" : c.kind === "rep" ? "#d8dcd2" : "#9a6a32";
