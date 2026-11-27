@@ -4139,7 +4139,7 @@
    const l = lv[u.k] || 0,
      cost = UPG_COST[l];
    return `<div class="ucard"><div class="nm">${u.n}</div><div class="d">${u.desc}</div><div class="lvl">${"★".repeat(l)}${"☆".repeat(3 - l)}</div>${l >= 3 ? '<div class="lock">NÍVEL MÁXIMO</div>' : `<button class="alt" data-a="tup" data-k="${u.k}" ${money < cost ? "disabled" : ""} style="margin:0"><i class="coin"></i>${cost}</button>`}</div>`;
- }).join("")}${Object.keys(ACC)
+ }).join("")}${Object.keys(ACC).filter((k) => k !== "heavy")
    .map((k) => {
      const d = ACC[k],
        a = acc[k];
@@ -4541,6 +4541,7 @@
   function buyAcc(k) {
     const a = acc[k],
       d = ACC[k];
+    if (k === "heavy") return;
     if (!a.own) {
       if (money < d.unlock) return;
       money -= d.unlock;
@@ -4560,7 +4561,7 @@
   }
   // caixa azul de armas achada no mapa
   function pickArmCrate() {
-    const notOwned = Object.keys(ACC).filter((k) => !acc[k].own);
+    const notOwned = Object.keys(ACC).filter((k) => k !== "heavy").filter((k) => !acc[k].own);
     let k;
     if (notOwned.length) {
       k = notOwned.includes("missile") ? "missile" : notOwned[0];
@@ -4569,7 +4570,7 @@
       if (SPECIALS.includes(k)) specSel = k;
       banner(`NOVO ACESSÓRIO: ${ACC[k].n.toUpperCase()}! (${k === "smoke" ? "L2 / Q" : "L1 / E"})`, 2.6);
     } else {
-      k = Object.keys(ACC)[(Math.random() * 3) | 0];
+      k = Object.keys(ACC).filter((k) => k !== "heavy")[(Math.random() * 3) | 0];
       acc[k].ammo = Math.min(ACC[k].max, acc[k].ammo + ACC[k].pack);
       banner(`+${ACC[k].pack} ${ACC[k].n.toUpperCase()}`, 1.6);
     }
@@ -5061,7 +5062,7 @@
         if(c.kind==="heavy"){
           acc.heavy.own=true;acc.heavy.ammo=Math.min(ACC.heavy.max,acc.heavy.ammo+2);specSel="heavy";specSel2="heavy";
           if(T)T.pod=true;if(T2)T2.pod=true;txt(a,b-12,"MÍSSIL PESADO +2","255,150,70");banner("MÍSSIL PESADO LIBERADO! E / L1",2.5);
-        } else if (c.kind === "launcher" || c.kind === "missile" || c.kind === "heavy") {
+        } else if (c.kind === "launcher" || c.kind === "missile") {
           acc.missile.own=true;acc.missile.ammo=Math.min(ACC.missile.max,Math.max(acc.missile.ammo,0)+4);specSel="missile";specSel2="missile";
           if(T)T.pod=true;if(T2)T2.pod=true;txt(a,b-12,"MÍSSIL LEVE +4","255,214,90");banner("MÍSSIL LEVE LIBERADO! E / L1",2.5);
         } else if (c.kind === "arm") pickArmCrate();
