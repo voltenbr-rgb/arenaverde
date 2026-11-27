@@ -1379,3 +1379,10 @@ html.mobile-controls body.tank #stage{
   #ov { overscroll-behavior: contain; }
   #ov .panel { -webkit-overflow-scrolling: touch; }
 }
+
+
+/* v32 — reforços aliados e identificação do Humvee na Garagem */
+#tbSoldiers { border-color:rgba(143,205,112,.7); color:#e6eed2; }
+#tbSoldiers.soldier-ready { background:rgba(72,111,43,.88); box-shadow:0 0 12px rgba(130,220,90,.28); }
+#tbSoldiers small { font-size:7px; }
+.humvee-mark { display:grid; place-items:center; margin:8px auto; width:min(260px,70vw); height:70px; border:2px solid #7f9f40; border-radius:10px; background:linear-gradient(135deg,#27351f,#10170e); color:#d6e9a5; font:900 34px Arial,sans-serif; letter-spacing:5px; text-shadow:2px 2px #000; }
