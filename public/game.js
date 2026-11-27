@@ -3990,9 +3990,6 @@
     tdrops = [];
     tdec = [];
     for (const a of LV.arms) tdrops.push({ x: a.x, y: a.y, kind: "arm", t: 0, life: 1e9 });
-    // Um lançador pesado de mísseis fica disponível no terreno em cada missão.
-    const launcherX = LV.L * 0.52;
-    tdrops.push({ x: launcherX, y: roadY(launcherX) + 24, kind: "launcher", t: 0, life: 1e9 });
     acc = cloneAcc(camp.acc);
     if (!acc[specSel].own) specSel = SPECIALS.find((k) => acc[k].own) || "missile";
     tmines = [];
@@ -4291,6 +4288,9 @@
         debris(40, o.type === "ruin" ? ["#7a7c78", "#5c5e5a", "#9a9c96"] : ["#7a5a3a", "#5a3f26", "#3d5224"], 2.6, 130);
         tScorch(fx0, fy0 + 4, 14);
         lootAt(o.x, o.y, 0.8);
+        if (Math.random() < 0.22) {
+          tdrops.push({ x: o.x + rnd(-12, 12), y: o.y + rnd(-10, 10), kind: "missile", t: 0, life: 18 });
+        }
         break;
       case "car":
         boomAt(o.x, o.y, 60, 30, 1.5, true);
@@ -5068,18 +5068,19 @@
       c.t += dt;
       c.life -= dt;
       const collector = T2&&T2.hp>0&&Math.hypot(c.x-T2.x,c.y-T2.y)<Math.hypot(c.x-T.x,c.y-T.y)?T2:T;
-      if (Math.hypot(c.x-collector.x,c.y-collector.y)<(c.kind === "launcher" ? 27 : 18)) {
+      if (Math.hypot(c.x-collector.x,c.y-collector.y)<(c.kind === "launcher" || c.kind === "missile" ? 27 : 18)) {
         c.life = 0;
         const [a, b] = P(c.x, c.y, 6);
         G(GL.y, a, b, { r0: 4, r1: 16, life: 0.3 });
-        if (c.kind === "launcher") {
+        if (c.kind === "launcher" || c.kind === "missile") {
           acc.missile.own = true;
           acc.missile.ammo = Math.min(ACC.missile.max, Math.max(acc.missile.ammo, 0) + 4);
           specSel = "missile";
+          specSel2 = "missile";
           if (T) T.pod = true;
           if (T2) T2.pod = true;
-          txt(a, b - 12, "LANÇADOR DE MÍSSEIS +4", "255,214,90");
-          banner("LANÇADOR PESADO EQUIPADO!", 1.8);
+          txt(a, b - 12, "MÍSSEIS +4", "255,214,90");
+          banner("MÍSSIL LIBERADO! E / L1 PARA DISPARAR", 2.5);
         } else if (c.kind === "arm") pickArmCrate();
         else if (c.kind === "rep") {
           collector.hp = Math.min(st.max, collector.hp + st.max * 0.2);
@@ -5516,12 +5517,12 @@
         if (c.life < 3 && ((c.life * 8) | 0) % 2) return;
         scr();
         const [sx, sy] = wiso(c.x, c.y);
-        shadow(sx, sy, c.kind === "launcher" ? 15 * K : 6 * K);
+        shadow(sx, sy, c.kind === "launcher" || c.kind === "missile" ? 15 * K : 6 * K);
         ctx.save();
-        ctx.translate(sx, sy - Math.abs(Math.sin(c.t * 3)) * (c.kind === "launcher" ? 5 : 3) * K);
+        ctx.translate(sx, sy - Math.abs(Math.sin(c.t * 3)) * (c.kind === "launcher" || c.kind === "missile" ? 5 : 3) * K);
         ctx.scale(K, K);
-        if (c.kind === "launcher") {
-          // Caixa grande com dois tubos de míssil, visível no chão antes da coleta.
+        if (c.kind === "launcher" || c.kind === "missile") {
+          // Caixa grande com dois tubos de míssil, visível nos escombros antes da coleta.
           ctx.fillStyle = "#171b16"; ctx.fillRect(-13, -16, 27, 16);
           ctx.fillStyle = "#6b7655"; ctx.fillRect(-12, -15, 25, 13);
           ctx.fillStyle = "#30382b"; ctx.fillRect(-10, -20, 20, 7);
@@ -5692,8 +5693,8 @@
   }
   function tUI() {
     if (!T || !LV) return;
-    const sl = `${ACC[specSel].n.toUpperCase()} ${acc[specSel].own ? acc[specSel].ammo : "-"}`,
-      fl = `FUMAÇA ${acc.smoke.own ? acc.smoke.ammo : "-"}`;
+    const sl = `${ACC[specSel].n.toUpperCase()} · E / L1 · ${acc[specSel].own ? "x" + acc[specSel].ammo : "NÃO COLETADO"}`,
+      fl = `FUMAÇA · Q / L2 ${acc.smoke.own ? "x" + acc.smoke.ammo : ""}`;
     if ($("tbSpec").textContent !== sl) $("tbSpec").textContent = sl;
     if ($("tbSmoke").textContent !== fl) $("tbSmoke").textContent = fl;
     const boss = tz.find((z) => z.d.big && !z.dead);
