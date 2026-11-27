@@ -5571,6 +5571,7 @@
         0.5,
       );
     T.pod = acc.missile.own;
+    if (T2) T2.pod = acc.missile.own;
     push(T.x, T.y, () => { drawTank(ctx, M, FS * K, T, tcfg, T.fl); });
     if (T2 && T2.hp > 0) push(T2.x, T2.y, () => drawTank(ctx, M, FS * K, T2, tcfg2, T2.fl));
     for (const m of tmines) push(m.x, m.y, () => drawMine(M, m), -2);
