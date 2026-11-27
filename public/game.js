@@ -3435,7 +3435,7 @@
       c.translate(t.x, t.y);
       c.rotate(t.ang);
     };
-    const R = W * 0.35,
+    const R = W * (cfg.chassis === "humvee" ? 0.29 : 0.35),
       px = -2.5;
     const tur = (h) => {
       lay(h);
@@ -3476,6 +3476,29 @@
     c.beginPath();
     c.ellipse(2, 2, L / 2 + 5, W / 2 + 4, 0, 0, 7);
     c.fill();
+    if (cfg.chassis === "humvee") {
+      // Base 4x4 do Humvee: pneus independentes, capô, cabine e para-brisa.
+      for (const x of [-L*.31, L*.31]) for (const y of [-W*.52, W*.52]) {
+        lay(1.2); c.fillStyle="#080b09"; c.beginPath(); c.ellipse(x,y,4.1,3.1,0,0,Math.PI*2); c.fill();
+        lay(2.1); c.fillStyle="#41483c"; c.beginPath(); c.ellipse(x,y,2.35,1.8,0,0,Math.PI*2); c.fill();
+        c.fillStyle="#a1a58a"; c.fillRect(x-.65,y-.55,1.3,1.1);
+      }
+      const body=()=>{c.beginPath();c.moveTo(-L/2+1,-W/2+3);c.lineTo(L/2-4,-W/2+3);c.lineTo(L/2,-W/2+6);c.lineTo(L/2,W/2-6);c.lineTo(L/2-4,W/2-3);c.lineTo(-L/2+1,W/2-3);c.closePath();};
+      for(let h=2.5;h<=7;h+=.5){lay(h);c.fillStyle=h<7?cm.side:cm.base;body();c.fill();}
+      lay(7);c.strokeStyle="#11160f";c.lineWidth=1.35;body();c.stroke();
+      camo(body,[L/2,W/2],0);
+      // Capô frontal e cabine alta com vidros fumê.
+      lay(7.2);c.fillStyle=cm.base;c.fillRect(L*.12,-W*.34,L*.34,W*.68);
+      c.fillStyle="#202c2b";c.fillRect(-L*.18,-W*.34,L*.31,W*.68);
+      c.fillStyle="#83a5a0";c.fillRect(-L*.16,-W*.29,L*.27,W*.58);
+      c.fillStyle="rgba(220,235,205,.45)";c.fillRect(-L*.14,-W*.28,1.1,W*.56);
+      c.fillStyle="#151a14";c.fillRect(L/2-2,-W*.27,1.4,W*.54);
+      c.fillStyle="#e6d99a";c.fillRect(L/2-1,-W*.31,1.2,2);c.fillRect(L/2-1,W*.25,1.2,2);
+      c.fillStyle="#171b16";c.fillRect(L/2-4,-W*.2,3,W*.4);
+      c.fillStyle="#9da78b";for(let k=0;k<4;k++)c.fillRect(L/2-3+k*.65,-W*.16,.35,W*.32);
+      c.fillStyle="#252b22";c.fillRect(-L/2+2,-W*.28,2,W*.56);
+      if(fl>0){c.fillStyle=`rgba(255,70,50,${Math.min(.35,fl*5)})`;body();c.fill();}
+    } else {
     // esteiras
     for (let h = 0; h <= 2.5; h += 0.5) {
       lay(h);
@@ -3575,10 +3598,13 @@
       hullShape();
       c.fill();
     }
+    }
     // torre angular com cesto traseiro
     const turShape = () => {
       c.beginPath();
-      if (cfg.chassis === "abrams") {
+      if (cfg.chassis === "humvee") {
+        c.moveTo(-R*1.2,-R*.55); c.lineTo(-R*.7,-R*.78); c.lineTo(R*.85,-R*.7); c.lineTo(R*1.15,-R*.38); c.lineTo(R*1.15,R*.38); c.lineTo(R*.85,R*.7); c.lineTo(-R*.7,R*.78); c.lineTo(-R*1.2,R*.55);
+      } else if (cfg.chassis === "abrams") {
         c.moveTo(-R * 1.5, -R * 0.72);
         c.lineTo(-R * 0.95, -R * 1.02);
         c.lineTo(R * 0.72, -R * 0.92);
@@ -4174,7 +4200,7 @@
     const ch = CHASSIS[tcfg.chassis],
       cn = CANNON[tcfg.cannon],
       m = Math.min(camp.m, MISSIONS.length - 1);
-    showOv(`<h2 class="title" style="font-size:clamp(22px,5vw,40px)">GARAGEM</h2><img class="tart" src="assets/tank/bravo.jpg" alt="Tanque T-90 Bravo"><p class="tname">T-90 BRAVO · TANQUE DE GUERRA</p><p class="sub">Campanha · Missão ${m + 1}/${MISSIONS.length}: ${MISSIONS[m].n}</p>
+    showOv(`<h2 class="title" style="font-size:clamp(22px,5vw,40px)">GARAGEM</h2>${tcfg.chassis === "humvee" ? '<div class="tart humvee-mark">4×4</div>' : '<img class="tart" src="assets/tank/bravo.jpg" alt="Tanque T-90 Bravo">' }<p class="tname">${ch.n.toUpperCase()} · ${tcfg.chassis === "humvee" ? "VEÍCULO MILITAR LEVE" : "TANQUE DE GUERRA"}</p><p class="sub">Campanha · Missão ${m + 1}/${MISSIONS.length}: ${MISSIONS[m].n}</p>
  <canvas id="tprev" width="560" height="300"></canvas>
  <div class="tstats"><span>VIDA <b>${ch.hp}</b></span><span>VELOC. <b>${ch.speed}</b></span><span>DANO <b>${cn.dmg}</b></span><span>RECARGA <b>${cn.reload}s</b></span><span>MOEDAS <b>${camp.money}</b></span></div>
  ${optRow("CAMUFLAGEM", "camo", CAMO)}
