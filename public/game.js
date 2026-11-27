@@ -3907,6 +3907,7 @@
       phase: 0,
       fl: 0,
     };
+    T2 = {x:2*CELL,y:roadY(2*CELL)+52,ang:0,tur:0,vel:0,hp:st.max,cd:.8,mgCd:0,phase:0,fl:0};
     tz = [];
     tp = [];
     zp = [];
@@ -3934,6 +3935,7 @@
     setTimeout(() => state === "play" && MODE === "tank" && banner(LV.M.intro.toUpperCase(), 3), 2800);
   }
   function tExit() {
+    T2=null; pad2.lx=pad2.ly=pad2.rx=pad2.ry=0; pad2.cannon=pad2.mg=false;
     engineOff();
     MODE = "def";
     document.body.classList.remove("tank");
@@ -4566,6 +4568,8 @@
   }
 
   /* ---------- controle de videogame (Gamepad API, PS4 genérico) ---------- */
+  const pad2 = { lx:0, ly:0, rx:0, ry:0, cannon:false, mg:false, id:"" };
+  let T2 = null;
   const pad = {
     lx: 0,
     ly: 0,
@@ -4590,9 +4594,10 @@
   function pollPad() {
     let gp = null;
     try {
-      gp = [...(navigator.getGamepads ? navigator.getGamepads() : [])].find(
-        (g) => g && g.connected && g.axes.length >= 2,
-      );
+      const allPads = [...(navigator.getGamepads ? navigator.getGamepads() : [])];
+      gp = allPads.find((g) => g && g.connected && g.axes.length >= 2);
+      const gp2 = allPads.filter((g) => g && g.connected && g.axes.length >= 2).find((g) => g.index !== (gp && gp.index));
+      if (gp2) { const dz2=v=>Math.abs(v)<.18?0:v, b2=i=>!!(gp2.buttons[i]&&(gp2.buttons[i].pressed||gp2.buttons[i].value>.4)); pad2.lx=dz2(gp2.axes[0]||0);pad2.ly=dz2(gp2.axes[1]||0);pad2.rx=dz2(gp2.axes[2]||0);pad2.ry=dz2((gp2.mapping==="standard"?gp2.axes[3]:gp2.axes.length>5?gp2.axes[5]:gp2.axes[3])||0);pad2.cannon=b2(7);pad2.mg=b2(5);pad2.id=gp2.id; } else {pad2.lx=pad2.ly=pad2.rx=pad2.ry=0;pad2.cannon=pad2.mg=false;pad2.id="";}
     } catch (e) {}
     if (!gp) {
       pad.lx = pad.ly = pad.rx = pad.ry = 0;
@@ -4640,6 +4645,18 @@
 
   function tUpdate(dt) {
     const st = tStats();
+    // COOPERATIVO LOCAL: o segundo controle pilota um segundo tanque independente.
+    if (T2 && state === "play") {
+      const f2=-pad2.ly, r2=pad2.lx; T2.ang+=(Math.abs(r2)>.18?r2:0)*st.turn*dt;
+      const v2=(Math.abs(f2)>.18?f2:0)*st.speed*(f2<0?.6:1); T2.vel+=(v2-T2.vel)*Math.min(1,dt*5);
+      const nx2=T2.x+Math.cos(T2.ang)*T2.vel*dt, ny2=T2.y+Math.sin(T2.ang)*T2.vel*dt;
+      if(!blocked(nx2,T2.y,11,false))T2.x=nx2; if(!blocked(T2.x,ny2,11,false))T2.y=ny2;
+      T2.phase+=T2.vel*dt*.8+Math.abs(r2)*dt*10;
+      if(Math.hypot(pad2.rx,pad2.ry)>.28)T2.tur=turnTo(T2.tur,screenToGroundDir(pad2.rx,pad2.ry),4.5*dt);
+      T2.cd-=dt;T2.mgCd-=dt;T2.fl=Math.max(0,T2.fl-dt); const c2=CANNON[tcfg.cannon];
+      if(pad2.cannon&&T2.cd<=0){const dx2=Math.cos(T2.tur),dy2=Math.sin(T2.tur),xx=T2.x+dx2*(c2.len+18),yy=T2.y+dy2*(c2.len+18);tp.push({k:"shell",x:xx,y:yy,h:9.8,vx:dx2*c2.speed,vy:dy2*c2.speed,life:c2.range/c2.speed,dmg:st.dmg,splash:c2.splash,bk:c2.k,owner:2});T2.cd=st.reload;sfx("cannon");}
+      if(pad2.mg&&T2.mgCd<=0){const a2=T2.tur+(Math.random()-.5)*.08;tp.push({k:"mg",x:T2.x+Math.cos(a2)*15,y:T2.y+Math.sin(a2)*15,h:12,vx:Math.cos(a2)*560,vy:Math.sin(a2)*560,life:.5,dmg:st.mgDmg,owner:2});T2.mgCd=.085;}
+    }
     // --- movimento estilo tanque (igual em teclado, controle e tela):
     // frente = acelera, trás = ré (sem girar), lados = giram o casco
     let fwd = (tkeys.has("w") ? 1 : 0) - (tkeys.has("s") ? 1 : 0),
@@ -4742,8 +4759,9 @@
       z.fl = Math.max(0, z.fl - dt);
       z.firing = Math.max(0, z.firing - dt);
       const d = z.d,
-        dx = T.x - z.x,
-        dy = T.y - z.y,
+        targetTank = T2 && T2.hp>0 && Math.hypot(T2.x-z.x,T2.y-z.y)<Math.hypot(T.x-z.x,T.y-z.y) ? T2 : T,
+        dx = targetTank.x - z.x,
+        dy = targetTank.y - z.y,
         dist = Math.hypot(dx, dy),
         reach = z.r + 13;
       let move = dist < 520;
@@ -4807,8 +4825,8 @@
       }
       if (dist <= reach) {
         z.bite = true;
-        T.hp -= d.dps * dt;
-        T.fl = 0.06;
+        targetTank.hp -= d.dps * dt;
+        targetTank.fl = 0.06;
         move = false;
         if (Math.abs(T.vel) > 20) tHurt(z, 70 * dt * (Math.abs(T.vel) / st.speed), true); // atropelar
       } else z.bite = false;
@@ -4909,10 +4927,11 @@
       p.life -= dt;
       p.x += p.vx * dt;
       p.y += p.vy * dt;
-      if (Math.hypot(p.x - T.x, p.y - T.y) < 14) {
+      const targetHit = T2&&T2.hp>0&&Math.hypot(p.x-T2.x,p.y-T2.y)<Math.hypot(p.x-T.x,p.y-T.y)?T2:T;
+      if (Math.hypot(p.x-targetHit.x,p.y-targetHit.y)<14) {
         p.dead = true;
-        T.hp -= p.dmg;
-        T.fl = 0.1;
+        targetHit.hp -= p.dmg;
+        targetHit.fl = 0.1;
         rumble(0.3, 80);
         const [a, b] = P(p.x, p.y, 8);
         if (p.k === "acid") {
@@ -4937,13 +4956,14 @@
     for (const c of tdrops) {
       c.t += dt;
       c.life -= dt;
-      if (Math.hypot(c.x - T.x, c.y - T.y) < 18) {
+      const collector = T2&&T2.hp>0&&Math.hypot(c.x-T2.x,c.y-T2.y)<Math.hypot(c.x-T.x,c.y-T.y)?T2:T;
+      if (Math.hypot(c.x-collector.x,c.y-collector.y)<18) {
         c.life = 0;
         const [a, b] = P(c.x, c.y, 6);
         G(GL.y, a, b, { r0: 4, r1: 16, life: 0.3 });
         if (c.kind === "arm") pickArmCrate();
         else if (c.kind === "rep") {
-          T.hp = Math.min(st.max, T.hp + st.max * 0.2);
+          collector.hp = Math.min(st.max, collector.hp + st.max * 0.2);
           txt(a, b - 8, "REPARO +20%", "140,235,90");
         } else {
           money += 30;
@@ -4964,7 +4984,7 @@
     const nestsLeft = LV.objs.filter((o) => o.nest).length,
       bossLeft = LV.M.boss && (tz.some((z) => z.d.big) || LV.sleepers.some((s) => s.type === "boss" && !s.woke));
     LV.done = !nestsLeft && !bossLeft;
-    if (Math.hypot(T.x - LV.ex.x, T.y - LV.ex.y) < 34) {
+    if (Math.hypot(T.x-LV.ex.x,T.y-LV.ex.y)<34 || (T2&&T2.hp>0&&Math.hypot(T2.x-LV.ex.x,T2.y-LV.ex.y)<34)) {
       if (LV.done) return tEnd(true);
       if (!LV.warned) {
         LV.warned = true;
@@ -4973,10 +4993,11 @@
       }
     }
     // --- câmera segue o tanque, olhando um pouco para a frente
-    const [sx, sy] = wiso(T.x + Math.cos(T.tur) * 40, T.y + Math.sin(T.tur) * 40);
+    const fx=T2&&T2.hp>0?(T.x+T2.x)/2:T.x, fy=T2&&T2.hp>0?(T.y+T2.y)/2:T.y;
+    const [sx, sy] = wiso(fx + Math.cos(T.tur) * 25, fy + Math.sin(T.tur) * 25);
     cam.x += (sx - VIEW.w * 0.5 - cam.x) * Math.min(1, dt * 3);
     cam.y += (sy - VIEW.h * 0.55 - cam.y) * Math.min(1, dt * 3);
-    if (T.hp <= 0) {
+    if (T.hp <= 0 && (!T2 || T2.hp<=0)) {
       T.hp = 0;
       const [a, b] = P(T.x, T.y, 6);
       boom(a, b, 3.2);
@@ -5415,9 +5436,8 @@
         0.5,
       );
     T.pod = acc.missile.own;
-    push(T.x, T.y, () => {
-      drawTank(ctx, M, FS * K, T, tcfg, T.fl);
-    });
+    push(T.x, T.y, () => { drawTank(ctx, M, FS * K, T, tcfg, T.fl); });
+    if(T2&&T2.hp>0) push(T2.x,T2.y,()=>drawTank(ctx,M,FS*K,T2,{...tcfg,camo:(tcfg.camo+1)%Object.keys(CAMO).length},T2.fl));
     for (const m of tmines) push(m.x, m.y, () => drawMine(M, m), -2);
     list.sort((a, b) => a.d - b.d);
     for (const it of list) it.f();
