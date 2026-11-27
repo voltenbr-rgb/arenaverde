@@ -1172,3 +1172,36 @@ body.tank #rotate {
 .ucard.acc {
   background: linear-gradient(#2e3f4f, #1f2a35);
 }
+
+:root{--ctl-opacity:.78;--ctl-size:1}
+body.tank #tctl{pointer-events:none}
+body.tank #tctl .stick,body.tank #tctl .tbtns,body.tank #tctl .tbtns2,body.tank #tctl #tOptions,body.tank #tctl #tOptionsPanel{pointer-events:auto}
+body.tank #tctl .stick{width:clamp(104px,26vmin,150px);opacity:var(--ctl-opacity);background:rgba(18,30,14,.32);border:2px solid #e1f5cd80;box-shadow:0 4px 18px #0008}
+body.tank #tctl .stick i{width:38%;height:38%;margin:-19% 0 0 -19%;background:#bedca080;border:2px solid #e6eed2aa}
+body.tank #tctl .stick span{position:absolute;left:0;right:0;bottom:12%;text-align:center;color:#fff9;font:700 8px Arial;text-shadow:0 1px 3px #000;pointer-events:none}
+body.tank #joy{left:max(14px,env(safe-area-inset-left));bottom:max(14px,env(safe-area-inset-bottom))}
+body.tank #joy2{right:max(14px,env(safe-area-inset-right));bottom:max(14px,env(safe-area-inset-bottom))}
+body.tank #tctl .tbtns{right:calc(max(14px,env(safe-area-inset-right)) + clamp(104px,26vmin,150px) + 10px);bottom:max(18px,env(safe-area-inset-bottom));flex-direction:column;gap:9px}
+body.tank #tctl .tbtns button,body.tank #tctl .tbtns2 button{transform:scale(var(--ctl-size));transform-origin:center;opacity:var(--ctl-opacity);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font:700 clamp(19px,4.5vmin,28px) Arial;line-height:1;color:#fff;text-shadow:0 2px 3px #000;background:#141e12bb;border:2px solid #ebf5dcb8;box-shadow:0 4px 12px #0008}
+body.tank #tctl .tbtns button small,body.tank #tctl .tbtns2 button small{font:700 7px Arial}
+body.tank #tbCannon{width:clamp(58px,15vmin,78px);height:clamp(58px,15vmin,78px);background:#d69619c4!important;border-color:#ffe08a!important}
+body.tank #tbMG{width:clamp(48px,12vmin,64px);height:clamp(48px,12vmin,64px)}
+body.tank #tctl .tbtns2{right:max(18px,env(safe-area-inset-right));bottom:calc(max(14px,env(safe-area-inset-bottom)) + clamp(104px,26vmin,150px) + 10px);gap:7px}
+body.tank #tctl .tbtns2 button{min-width:49px;min-height:45px;border-radius:13px;font-size:19px;padding:5px}
+body.tank #tbSwap{font-size:22px!important;min-width:42px!important;width:42px}
+body.tank #tOptions{position:absolute;top:max(10px,env(safe-area-inset-top));left:max(10px,env(safe-area-inset-left));width:38px;height:38px;border-radius:50%;border:1px solid #ffffff66;background:#101a0dcc;color:#fff;font-size:17px;opacity:.45;pointer-events:auto}
+#tOptionsPanel[hidden]{display:none!important}
+body.tank #tOptionsPanel{position:absolute;top:55px;left:max(10px,env(safe-area-inset-left));z-index:9;width:min(270px,78vw);padding:12px;border:1px solid #b9d78a;background:#10190ff2;color:#f3f7e8;border-radius:12px;box-shadow:0 8px 30px #000b;font:12px Arial}
+#tOptionsPanel header,#tOptionsPanel footer{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}
+#tOptionsPanel header button,#tOptionsPanel footer button{background:#334923;color:white;border:1px solid #8da96a;border-radius:7px;padding:7px 10px}
+#tOptionsPanel label{display:block;margin:10px 0;font-size:11px}
+#tOptionsPanel input,#tOptionsPanel select{display:block;width:100%;margin-top:6px;accent-color:#b7dc65}
+#tOptionsPanel select{padding:7px;background:#202e18;color:white;border:1px solid #718c4d;border-radius:6px}
+html[data-ctlstyle="azul"] body.tank #tctl .stick{border-color:#79caff;background:#17466a66}
+html[data-ctlstyle="azul"] body.tank #tctl .tbtns button,html[data-ctlstyle="azul"] body.tank #tctl .tbtns2 button{background:#14517dcc;border-color:#9adfff}
+html[data-ctlstyle="neon"] body.tank #tctl .stick{border-color:#50ffd0;background:#083f3b66}
+html[data-ctlstyle="neon"] body.tank #tctl .tbtns button,html[data-ctlstyle="neon"] body.tank #tctl .tbtns2 button{background:#07564dcc;border-color:#62ffce}
+html[data-ctlstyle="discreto"] body.tank #tctl .stick{background:#0003;border-color:#ffffff44}
+html[data-ctlstyle="discreto"] body.tank #tctl .tbtns button,html[data-ctlstyle="discreto"] body.tank #tctl .tbtns2 button{background:#0008;border-color:#ffffff55}
+@media(orientation:portrait) and (pointer:coarse){body.tank #tctl .stick{width:clamp(96px,25vmin,130px)}body.tank #tctl .tbtns{right:calc(max(8px,env(safe-area-inset-right)) + clamp(96px,25vmin,130px) + 6px)}body.tank #tctl .tbtns2{bottom:calc(max(8px,env(safe-area-inset-bottom)) + clamp(96px,25vmin,130px) + 8px)}}
+@media(pointer:fine){body.tank #tctl{display:none!important}}
