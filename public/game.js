@@ -1,20 +1,6 @@
 /* Arena Verde — lógica do jogo (canvas + Web Audio, sem frameworks) */
 {
   const $ = (id) => document.getElementById(id);
-  // ATIVE temporariamente como true somente durante uma publicação/manutenção.
-  // Em funcionamento normal, deixe false: o jogo abre sem ?dev=1 ou ?teste=1.
-  const MODO_MANUTENCAO = false;
-  if (MODO_MANUTENCAO) {
-    const gate = document.createElement("section");
-    gate.id = "maintenanceGate";
-    gate.setAttribute("role", "alert");
-    gate.innerHTML = '<div class="maintenance-card"><div class="maintenance-mark">⚙</div><p class="maintenance-kicker">ARENA VERDE · SISTEMA TÁTICO</p><h1>EM MANUTENÇÃO</h1><p>Estamos realizando melhorias e ajustes no campo de batalha. Voltaremos em breve.</p><span>AGUARDE · ATUALIZAÇÃO EM ANDAMENTO</span></div>';
-    Object.assign(gate.style, {position:"fixed",inset:"0",zIndex:"2147483647",display:"grid",placeItems:"center",padding:"24px",background:"radial-gradient(ellipse at center,#26351d 0%,#0b1008 72%)",color:"#edf5df",fontFamily:"Arial,sans-serif",textAlign:"center"});
-    const style = document.createElement("style");
-    style.textContent = '#maintenanceGate .maintenance-card{width:min(520px,100%);padding:38px 26px;border:1px solid #9eb77b88;border-radius:18px;background:#111b10ee;box-shadow:0 18px 70px #000b}#maintenanceGate .maintenance-mark{font-size:42px;color:#d6e9a5}#maintenanceGate .maintenance-kicker{font-size:11px;letter-spacing:3px;color:#a9c77d}#maintenanceGate h1{font-size:clamp(28px,7vw,46px);letter-spacing:2px;margin:18px 0;color:#f2d36e}#maintenanceGate p:not(.maintenance-kicker){font-size:15px;line-height:1.6;color:#d3ddc6}#maintenanceGate span{display:inline-block;margin-top:18px;font-size:10px;letter-spacing:2px;color:#9db77c}';
-    document.head.appendChild(style);
-    document.body.appendChild(gate);
-  }
   const mobileTouch = new URLSearchParams(location.search).get("mobile") === "1" || (matchMedia("(pointer: coarse)").matches && matchMedia("(max-width: 1100px)").matches);
   document.documentElement.classList.toggle("mobile-controls", mobileTouch);
   const cv = $("cv"),
