@@ -5790,7 +5790,14 @@
   });
   $("tbSwap").addEventListener("click", () => {
     audio();
-    cycleSpec(1);
+    if (mobileTouch) {
+      const ammoTypes = ["missile", "heavy"].filter(k => acc[k].own);
+      if (!ammoTypes.length) { banner("NENHUM MÍSSIL DISPONÍVEL", 1.5); return; }
+      const i = ammoTypes.indexOf(specSel);
+      specSel = ammoTypes[(i + 1 + ammoTypes.length) % ammoTypes.length];
+      sfx("reload");
+      banner(`MUNIÇÃO: ${ACC[specSel].n.toUpperCase()} x${acc[specSel].ammo}`, 1.1);
+    } else cycleSpec(1);
   });
   // Multi-touch: cada polegar mantém seu próprio pointerId.
   const moveStick=$("moveStick");
