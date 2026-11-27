@@ -16,6 +16,13 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="style.css?v=13" />
+    <style>
+      #avWorkshopLink{position:fixed;right:max(12px,env(safe-area-inset-right));bottom:max(14px,env(safe-area-inset-bottom));z-index:20;display:flex;align-items:center;gap:8px;padding:11px 14px;border:2px solid #b7f34a;border-radius:999px;background:#11190eeF;color:#d9ff9b;font:700 10px 'Press Start 2P',monospace;text-decoration:none;box-shadow:0 0 0 2px #10160c,0 0 16px #b7f34a88;animation:avWorkshopPulse 1.6s ease-in-out infinite}
+      #avWorkshopLink:active{transform:scale(.96)}
+      #avWorkshopLink .avWrench{font:20px system-ui,sans-serif}
+      @keyframes avWorkshopPulse{0%,100%{box-shadow:0 0 0 2px #10160c,0 0 7px #b7f34a66}50%{box-shadow:0 0 0 2px #10160c,0 0 20px #b7f34acc}}
+      @media(prefers-reduced-motion:reduce){#avWorkshopLink{animation:none}}
+    </style>
   </head>
   <body>
     <div id="app">
@@ -77,6 +84,6 @@
     <div id="ov"><div class="panel plate" id="panel"></div></div>
     <div id="cardv" hidden role="dialog" aria-label="Carta"><img alt="" /><span>TOQUE PARA FECHAR</span></div>
 
-    <script src="game.js?v=13" defer></script>
+    <a id="avWorkshopLink" href="/oficina/" aria-label="Abrir Oficina 3D"><span class="avWrench">⚙</span><span>OFICINA 3D</span></a>\n    <script src="game.js?v=13" defer></script>
   </body>
 </html>
