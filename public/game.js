@@ -3990,12 +3990,12 @@
     tdrops = [];
     tdec = [];
     for (const a of LV.arms) tdrops.push({ x: a.x, y: a.y, kind: "arm", t: 0, life: 1e9 });
-    acc = cloneAcc(camp.acc);
-    if (!acc[specSel].own) specSel = SPECIALS.find((k) => acc[k].own) || "missile";
+    acc = Object.assign(accDefault(), cloneAcc(camp.acc));
+    if (!acc[specSel] || !acc[specSel].own) specSel = SPECIALS.find((k) => acc[k].own) || "missile";
     tmines = [];
     clouds = [];
-    accCd = { missile: 0, mine: 0, smoke: 0 };
-    accCd2 = { missile: 0, mine: 0, smoke: 0 };
+    accCd = { missile: 0, heavy: 0, mine: 0, smoke: 0 };
+    accCd2 = { missile: 0, heavy: 0, mine: 0, smoke: 0 };
     specSel2 = specSel;
     kills = 0;
     state = "play";
