@@ -2,7 +2,7 @@
 {
   const $ = (id) => document.getElementById(id);
   // CONFIGURAÇÃO DE MANUTENÇÃO: true bloqueia o acesso público; ?dev=1 ou ?teste=1 libera a sessão de teste.
-  const MODO_MANUTENCAO = false;
+  const MODO_MANUTENCAO = true;
   const DEV_QUERY = new URLSearchParams(location.search);
   let DEV_BYPASS = DEV_QUERY.get("dev") === "1" || DEV_QUERY.get("teste") === "1";
   try {
@@ -3340,6 +3340,7 @@
     medio: { n: "Médio", hp: 360, speed: 48, turn: 2.2, L: 29, W: 19, desc: "Equilibrado" },
     pesado: { n: "Pesado", hp: 520, speed: 36, turn: 1.8, L: 32, W: 21, desc: "Muita blindagem, lento" },
     abrams: { n: "M1 Abrams", hp: 620, speed: 44, turn: 2.0, L: 34, W: 22, desc: "Tanque de batalha americano · blindagem pesada e alta mobilidade" },
+    humvee: { n: "Humvee", hp: 310, speed: 68, turn: 3.25, L: 30, W: 18, desc: "Veículo militar leve · muito ágil, rápido e com blindagem reduzida" },
   };
   // melhorias compradas na oficina entre as ondas (valem só na partida)
   const UPG = [
@@ -3434,7 +3435,7 @@
       c.translate(t.x, t.y);
       c.rotate(t.ang);
     };
-    const R = W * 0.35,
+    const R = W * (cfg.chassis === "humvee" ? 0.29 : 0.35),
       px = -2.5;
     const tur = (h) => {
       lay(h);
@@ -3475,6 +3476,29 @@
     c.beginPath();
     c.ellipse(2, 2, L / 2 + 5, W / 2 + 4, 0, 0, 7);
     c.fill();
+    if (cfg.chassis === "humvee") {
+      // Base 4x4 do Humvee: pneus independentes, capô, cabine e para-brisa.
+      for (const x of [-L*.31, L*.31]) for (const y of [-W*.52, W*.52]) {
+        lay(1.2); c.fillStyle="#080b09"; c.beginPath(); c.ellipse(x,y,4.1,3.1,0,0,Math.PI*2); c.fill();
+        lay(2.1); c.fillStyle="#41483c"; c.beginPath(); c.ellipse(x,y,2.35,1.8,0,0,Math.PI*2); c.fill();
+        c.fillStyle="#a1a58a"; c.fillRect(x-.65,y-.55,1.3,1.1);
+      }
+      const body=()=>{c.beginPath();c.moveTo(-L/2+1,-W/2+3);c.lineTo(L/2-4,-W/2+3);c.lineTo(L/2,-W/2+6);c.lineTo(L/2,W/2-6);c.lineTo(L/2-4,W/2-3);c.lineTo(-L/2+1,W/2-3);c.closePath();};
+      for(let h=2.5;h<=7;h+=.5){lay(h);c.fillStyle=h<7?cm.side:cm.base;body();c.fill();}
+      lay(7);c.strokeStyle="#11160f";c.lineWidth=1.35;body();c.stroke();
+      camo(body,[L/2,W/2],0);
+      // Capô frontal e cabine alta com vidros fumê.
+      lay(7.2);c.fillStyle=cm.base;c.fillRect(L*.12,-W*.34,L*.34,W*.68);
+      c.fillStyle="#202c2b";c.fillRect(-L*.18,-W*.34,L*.31,W*.68);
+      c.fillStyle="#83a5a0";c.fillRect(-L*.16,-W*.29,L*.27,W*.58);
+      c.fillStyle="rgba(220,235,205,.45)";c.fillRect(-L*.14,-W*.28,1.1,W*.56);
+      c.fillStyle="#151a14";c.fillRect(L/2-2,-W*.27,1.4,W*.54);
+      c.fillStyle="#e6d99a";c.fillRect(L/2-1,-W*.31,1.2,2);c.fillRect(L/2-1,W*.25,1.2,2);
+      c.fillStyle="#171b16";c.fillRect(L/2-4,-W*.2,3,W*.4);
+      c.fillStyle="#9da78b";for(let k=0;k<4;k++)c.fillRect(L/2-3+k*.65,-W*.16,.35,W*.32);
+      c.fillStyle="#252b22";c.fillRect(-L/2+2,-W*.28,2,W*.56);
+      if(fl>0){c.fillStyle=`rgba(255,70,50,${Math.min(.35,fl*5)})`;body();c.fill();}
+    } else {
     // esteiras
     for (let h = 0; h <= 2.5; h += 0.5) {
       lay(h);
@@ -3574,10 +3598,13 @@
       hullShape();
       c.fill();
     }
+    }
     // torre angular com cesto traseiro
     const turShape = () => {
       c.beginPath();
-      if (cfg.chassis === "abrams") {
+      if (cfg.chassis === "humvee") {
+        c.moveTo(-R*1.2,-R*.55); c.lineTo(-R*.7,-R*.78); c.lineTo(R*.85,-R*.7); c.lineTo(R*1.15,-R*.38); c.lineTo(R*1.15,R*.38); c.lineTo(R*.85,R*.7); c.lineTo(-R*.7,R*.78); c.lineTo(-R*1.2,R*.55);
+      } else if (cfg.chassis === "abrams") {
         c.moveTo(-R * 1.5, -R * 0.72);
         c.lineTo(-R * 0.95, -R * 1.02);
         c.lineTo(R * 0.72, -R * 0.92);
@@ -3861,6 +3888,8 @@
   let T = null,
     LV = null, // nível atual: { m, L, W, theme, objs, decor, ex }
     tz = [],
+    tSoldiers = [],
+    soldierCharges = 0,
     tp = [],
     zp = [],
     tcorpse = [],
@@ -4060,6 +4089,9 @@
     tdrops = [];
     tdec = [];
     for (const a of LV.arms) tdrops.push({ x: a.x, y: a.y, kind: "arm", t: 0, life: 1e9 });
+    tSoldiers = []; soldierCharges = 0;
+    // Caixa de reforços garantida no início; outras podem surgir ao destruir estruturas.
+    tdrops.push({ x: T.x + 104, y: T.y + 30, kind: "soldier", t: 0, life: 1e9 });
     acc = Object.assign(accDefault(), cloneAcc(camp.acc));
     if (!acc[specSel] || !acc[specSel].own) specSel = SPECIALS.find((k) => acc[k].own) || "missile";
     tmines = [];
@@ -4089,7 +4121,7 @@
     document.body.classList.remove("tank");
     tkeys.clear();
     tin.cannon = tin.mg = tin.spec = tin.smoke = tin.moveUp = tin.moveDown = tin.moveLeft = tin.moveRight = tin.aimLeft = tin.aimRight = false;
-    tin.joyX = tin.joyY = 0; tin.mouse = null;
+    tin.joyX = tin.joyY = 0; tin.mouse = null; tSoldiers = []; soldierCharges = 0;
     try {
       if (document.fullscreenElement) document.exitFullscreen();
     } catch (e) {}
@@ -4168,7 +4200,7 @@
     const ch = CHASSIS[tcfg.chassis],
       cn = CANNON[tcfg.cannon],
       m = Math.min(camp.m, MISSIONS.length - 1);
-    showOv(`<h2 class="title" style="font-size:clamp(22px,5vw,40px)">GARAGEM</h2><img class="tart" src="assets/tank/bravo.jpg" alt="Tanque T-90 Bravo"><p class="tname">T-90 BRAVO · TANQUE DE GUERRA</p><p class="sub">Campanha · Missão ${m + 1}/${MISSIONS.length}: ${MISSIONS[m].n}</p>
+    showOv(`<h2 class="title" style="font-size:clamp(22px,5vw,40px)">GARAGEM</h2>${tcfg.chassis === "humvee" ? '<div class="tart humvee-mark">4×4</div>' : '<img class="tart" src="assets/tank/bravo.jpg" alt="Tanque T-90 Bravo">' }<p class="tname">${ch.n.toUpperCase()} · ${tcfg.chassis === "humvee" ? "VEÍCULO MILITAR LEVE" : "TANQUE DE GUERRA"}</p><p class="sub">Campanha · Missão ${m + 1}/${MISSIONS.length}: ${MISSIONS[m].n}</p>
  <canvas id="tprev" width="560" height="300"></canvas>
  <div class="tstats"><span>VIDA <b>${ch.hp}</b></span><span>VELOC. <b>${ch.speed}</b></span><span>DANO <b>${cn.dmg}</b></span><span>RECARGA <b>${cn.reload}s</b></span><span>MOEDAS <b>${camp.money}</b></span></div>
  ${optRow("CAMUFLAGEM", "camo", CAMO)}
@@ -4237,6 +4269,36 @@
   }
 
   /* ---------- combate ---------- */
+  function deploySoldiers() {
+    if (soldierCharges <= 0) { banner("SEM CAIXA DE SOLDADOS · PROCURE REFORÇOS NO MAPA", 1.8); return; }
+    if (tSoldiers.length >= 2) { banner("OS DOIS SOLDADOS JÁ ESTÃO EM CAMPO", 1.5); return; }
+    soldierCharges--;
+    const need = 2 - tSoldiers.length;
+    for (let i = 0; i < need; i++) {
+      const side = i === 0 ? -1 : 1;
+      tSoldiers.push({ isAllySoldier:true, x:T.x-Math.cos(T.ang)*24+Math.cos(T.ang+Math.PI/2)*side*17, y:T.y-Math.sin(T.ang)*24+Math.sin(T.ang+Math.PI/2)*side*17, hp:100, max:100, fl:0, t:0, cd:rnd(.1,.5), aim:T.tur, dead:false, side });
+    }
+    banner("ESQUADRÃO ALIADO · 2 SOLDADOS EM CAMPO", 2); sfx("wave");
+  }
+  function updateAlliedSoldiers(dt) {
+    for (const a of tSoldiers) {
+      if (a.dead) continue;
+      a.t += dt; a.fl = Math.max(0, a.fl - dt); a.cd -= dt;
+      const back = T.ang + Math.PI, lateral = T.ang + (a.side < 0 ? -Math.PI/2 : Math.PI/2);
+      const tx = T.x + Math.cos(back)*25 + Math.cos(lateral)*17;
+      const ty = T.y + Math.sin(back)*25 + Math.sin(lateral)*17;
+      a.x += (tx-a.x) * Math.min(1, dt*4.2); a.y += (ty-a.y) * Math.min(1, dt*4.2);
+      let target = null, best = 245;
+      for (const z of tz) if (!z.dead) { const d=Math.hypot(z.x-a.x,z.y-a.y); if(d<best){best=d;target=z;} }
+      if (target) {
+        a.aim = turnTo(a.aim, Math.atan2(target.y-a.y,target.x-a.x), 7*dt);
+        if (a.cd <= 0) {
+          const ang=a.aim; tp.push({k:"ally",x:a.x+Math.cos(ang)*8,y:a.y+Math.sin(ang)*8,h:12,vx:Math.cos(ang)*390,vy:Math.sin(ang)*390,life:.62,dmg:13,owner:0});
+          a.cd=.48; const [fx,fy]=P(a.x+Math.cos(ang)*8,a.y+Math.sin(ang)*8,12); G(GL.y,fx,fy,{r0:1.5,r1:3,life:.07,a:.8});
+        }
+      }
+    }
+  }
   function tSpawn(type, x, y) {
     const d = ZD[type],
       hp = Math.round(d.hp * (1 + camp.m * 0.18));
@@ -4300,8 +4362,10 @@
     }
   }
   function lootAt(x, y, chance) {
-    if (Math.random() < chance)
-      tdrops.push({ x, y, kind: Math.random() < 0.45 ? "rep" : "cash", t: 0, life: 14, z0: 0 });
+    if (Math.random() < chance) {
+      const roll = Math.random();
+      tdrops.push({ x, y, kind: roll < 0.12 ? "soldier" : roll < 0.54 ? "rep" : "cash", t: 0, life: 18, z0: 0 });
+    }
   }
   // dano num objeto destrutível
   function hitObj(o, dmg) {
@@ -4843,7 +4907,7 @@
     let fwd = (tkeys.has("w") ? 1 : 0) - (tkeys.has("s") ? 1 : 0),
       rot = (tkeys.has("d") ? 1 : 0) - (tkeys.has("a") ? 1 : 0);
     const sens = mobileCfg.sensitivity / 100;
-    if (mobileTouch && (Math.abs(tin.joyX) > 0.04 || Math.abs(tin.joyY) > 0.04)) {
+    if (mobileTouch && Math.hypot(tin.joyX, tin.joyY) > 0.08) {
       fwd = -tin.joyY;
       rot = tin.joyX;
     } else if (tin.moveUp || tin.moveDown || tin.moveLeft || tin.moveRight) {
@@ -4853,13 +4917,19 @@
       fwd = Math.abs(pad.ly) > .2 ? -pad.ly : 0;
       rot = Math.abs(pad.lx) > .2 ? pad.lx : 0;
     }
-    T.ang += rot * st.turn * dt;
+    if (mobileTouch && Math.hypot(tin.joyX, tin.joyY) > 0.08) {
+      // O vetor do stick define uma direção absoluta no mapa; o veículo sempre avança de frente.
+      const magnitude = Math.min(1, Math.hypot(tin.joyX, tin.joyY));
+      const desiredHeading = screenToGroundDir(tin.joyX, tin.joyY);
+      T.ang = turnTo(T.ang, desiredHeading, st.turn * 1.8 * dt);
+      fwd = magnitude; rot = 0;
+    } else { T.ang += rot * st.turn * dt; }
     if (mobileTouch) {
       if (mobileLastHullAngle == null) mobileLastHullAngle = T.ang;
       T.tur += T.ang - mobileLastHullAngle; // conserva o ângulo relativo entre torreta e chassi
       mobileLastHullAngle = T.ang;
     }
-    const target = fwd * st.speed * (fwd < 0 ? 0.6 : 1);
+    const target = mobileTouch && Math.hypot(tin.joyX, tin.joyY) > 0.08 ? Math.max(0, fwd) * st.speed : fwd * st.speed * (fwd < 0 ? 0.6 : 1);
     T.vel += (target - T.vel) * Math.min(1, dt * 5);
     const nx = T.x + Math.cos(T.ang) * T.vel * dt,
       ny = T.y + Math.sin(T.ang) * T.vel * dt;
@@ -4891,6 +4961,7 @@
       engine.g.gain.setTargetAtTime(sound ? 0.05 + 0.1 * f : 0, AC.currentTime, 0.08);
       engine.o.frequency.setTargetAtTime(36 + 34 * f, AC.currentTime, 0.1);
     }
+    updateAlliedSoldiers(dt);
     // --- torreta: mobile = setas dedicadas; desktop = cursor do mouse/controle
     const turretTurn = (tin.aimRight ? 1 : 0) - (tin.aimLeft ? 1 : 0) + (tkeys.has("arrowright") ? 1 : 0) - (tkeys.has("arrowleft") ? 1 : 0);
     if (mobileTouch) {
@@ -4957,11 +5028,10 @@
       z.firing = Math.max(0, z.firing - dt);
       const d = z.d;
       if (z.stun > 0) { z.stun = Math.max(0, z.stun - dt); z.bite = false; continue; }
-      const targetTank = T2 && T2.hp>0 && Math.hypot(T2.x-z.x,T2.y-z.y)<Math.hypot(T.x-z.x,T.y-z.y) ? T2 : T,
-        dx = targetTank.x - z.x,
-        dy = targetTank.y - z.y,
-        dist = Math.hypot(dx, dy),
-        reach = z.r + 13;
+      const targets = [T, ...(T2 && T2.hp > 0 ? [T2] : []), ...tSoldiers.filter(a => !a.dead && a.hp > 0)];
+      const targetTank = targets.reduce((best, candidate) => Math.hypot(candidate.x-z.x,candidate.y-z.y) < Math.hypot(best.x-z.x,best.y-z.y) ? candidate : best, targets[0]);
+      const targetIsSoldier = !!targetTank.isAllySoldier;
+      const dx = targetTank.x - z.x, dy = targetTank.y - z.y, dist = Math.hypot(dx, dy), reach = z.r + (targetIsSoldier ? 7 : 13);
       let move = dist < 520;
       if (z.lost > 0) {
         // perdido na fumaça: anda sem rumo, devagar, e não ataca
@@ -5024,10 +5094,11 @@
       if (dist <= reach) {
         z.bite = true;
         targetTank.hp -= d.dps * dt;
-        radioDamageCue(targetTank);
+        if (!targetIsSoldier) radioDamageCue(targetTank);
         targetTank.fl = 0.06;
+        if (targetIsSoldier && targetTank.hp <= 0) { targetTank.hp = 0; targetTank.dead = true; banner("SOLDADO ABATIDO", 1); }
         move = false;
-        if (Math.abs(T.vel) > 20) tHurt(z, 70 * dt * (Math.abs(T.vel) / st.speed), true); // atropelar
+        if (!targetIsSoldier && Math.abs(T.vel) > 20) tHurt(z, 70 * dt * (Math.abs(T.vel) / st.speed), true); // atropelar
       } else z.bite = false;
       if (move) {
         const sp = d.sp * 2.2;
@@ -5135,12 +5206,15 @@
       p.life -= dt;
       p.x += p.vx * dt;
       p.y += p.vy * dt;
-      const targetHit = T2&&T2.hp>0&&Math.hypot(p.x-T2.x,p.y-T2.y)<Math.hypot(p.x-T.x,p.y-T.y)?T2:T;
+      const enemyTargets = [T, ...(T2 && T2.hp > 0 ? [T2] : []), ...tSoldiers.filter(a => !a.dead && a.hp > 0)];
+      const targetHit = enemyTargets.reduce((best, candidate) => Math.hypot(p.x-candidate.x,p.y-candidate.y) < Math.hypot(p.x-best.x,p.y-best.y) ? candidate : best, enemyTargets[0]);
+      const targetIsSoldier = !!targetHit.isAllySoldier;
       if (Math.hypot(p.x-targetHit.x,p.y-targetHit.y)<14) {
         p.dead = true;
         targetHit.hp -= p.dmg;
-        radioDamageCue(targetHit);
+        if (!targetIsSoldier) radioDamageCue(targetHit);
         targetHit.fl = 0.1;
+        if (targetIsSoldier && targetHit.hp <= 0) { targetHit.hp = 0; targetHit.dead = true; banner("SOLDADO ABATIDO", 1); }
         rumble(0.3, 80);
         const [a, b] = P(p.x, p.y, 8);
         if (p.k === "acid") {
@@ -5177,6 +5251,7 @@
           acc.missile.own=true;acc.missile.ammo=Math.min(ACC.missile.max,Math.max(acc.missile.ammo,0)+4);specSel="missile";specSel2="missile";
           if(T)T.pod=true;if(T2)T2.pod=true;txt(a,b-12,"MÍSSIL LEVE +4","255,214,90");banner("MÍSSIL LEVE LIBERADO! E / L1",2.5);
         } else if (c.kind === "arm") pickArmCrate();
+        else if (c.kind === "soldier") { soldierCharges = Math.min(5, soldierCharges + 1); banner(`REFORÇO DISPONÍVEL · ${soldierCharges} CAIXA(S)`, 2); }
         else if (c.kind === "rep") {
           collector.hp = Math.min(st.max, collector.hp + st.max * 0.2);
           txt(a, b - 8, "REPARO +20%", "140,235,90");
@@ -5189,6 +5264,7 @@
       }
     }
     tz = tz.filter((z) => !z.dead);
+    tSoldiers = tSoldiers.filter(a => !a.dead && a.hp > 0);
     tp = tp.filter((p) => !p.dead);
     zp = zp.filter((p) => !p.dead);
     tdrops = tdrops.filter((c) => c.life > 0);
@@ -5642,6 +5718,9 @@
         },
         -1,
       );
+    for (const a of tSoldiers) push(a.x, a.y, () => {
+      scr(); const [sx, sy] = wiso(a.x, a.y); ctx.save(); ctx.translate(sx, sy - 15*K); ctx.rotate(a.aim || 0); ctx.drawImage(FR.rifle.idle, -9*K, -8*K, 18*K, 16*K); ctx.restore(); bar(sx, sy - 20*K, a.hp, a.max);
+    }, 0.4);
     for (const c of tdrops)
       push(c.x, c.y, () => {
         if (c.life < 3 && ((c.life * 8) | 0) % 2) return;
@@ -5667,11 +5746,12 @@
         }
         ctx.fillStyle = "#141a0e";
         ctx.fillRect(-5, -9, 11, 9);
-        ctx.fillStyle = c.kind === "arm" ? "#3a5a8a" : c.kind === "rep" ? "#d8dcd2" : "#9a6a32";
+        ctx.fillStyle = c.kind === "soldier" ? "#496d35" : c.kind === "arm" ? "#3a5a8a" : c.kind === "rep" ? "#d8dcd2" : "#9a6a32";
         ctx.fillRect(-4, -8, 9, 7);
         ctx.fillStyle = c.kind === "arm" ? "#e6eed2" : c.kind === "rep" ? "#c0392b" : "#f2c230";
         ctx.fillRect(0, -8, 1, 7);
         ctx.fillRect(-4, -5, 9, 1);
+        if (c.kind === "soldier") { ctx.fillStyle="#e6eed2"; ctx.fillRect(-1,-7,2,6); ctx.fillRect(-3,-5,6,2); }
         ctx.restore();
       });
     for (const z of tz)
@@ -5735,7 +5815,7 @@
       // Trilha com sombra escura e núcleo quente: leitura imediata em vegetação densa.
       ctx.strokeStyle = "rgba(20,13,7,.82)"; ctx.lineWidth = (p.k === "shell" ? 3.1 : 1.8) * K;
       ctx.beginPath(); ctx.moveTo(ex, ey); ctx.lineTo(sx, sy); ctx.stroke();
-      ctx.strokeStyle = p.k === "shell" || p.k === "msl" ? "rgba(255,170,70,.98)" : "rgba(255,235,165,.98)";
+      ctx.strokeStyle = p.k === "ally" ? "rgba(145,245,115,.98)" : p.k === "shell" || p.k === "msl" ? "rgba(255,170,70,.98)" : "rgba(255,235,165,.98)";
       ctx.lineWidth = (p.k === "shell" ? 1.35 : 0.75) * K;
       ctx.beginPath(); ctx.moveTo(ex, ey); ctx.lineTo(sx, sy); ctx.stroke();
       const r = (p.k === "shell" ? 4 : 2) * K;
@@ -5774,7 +5854,7 @@
     ctx.fillRect(22, 58, 190 * f, 10);
     ctx.fillStyle = "#e6eed2";
     ctx.fillText(`P1 ${Math.ceil(f * 100)}%`, 220, 68);
-    if (T2 || !mobileTouch) {
+    if (!mobileTouch) {
       ctx.fillStyle = "#000"; ctx.fillRect(22, 76, 190, 7);
       ctx.fillStyle = f2 > .5 ? "#59b9ff" : f2 > .25 ? "#f2c230" : "#e0533a";
       ctx.fillRect(22, 76, 190 * f2, 7);
@@ -5833,6 +5913,8 @@
       fl = mobileTouch ? `☁ FUMAÇA x${acc.smoke.ammo}` : `FUMAÇA · Q / L2 ${acc.smoke.own ? "x" + acc.smoke.ammo : ""}`;
     if ($("tbSpec").textContent !== sl) $("tbSpec").textContent = sl;
     if ($("tbSmoke").textContent !== fl) $("tbSmoke").textContent = fl;
+    const soldierButton = $("tbSoldiers");
+    if (soldierButton) { const small = soldierButton.querySelector("small"), label = `SOLDADOS ${soldierCharges} · ${tSoldiers.length}/2`; if (small && small.textContent !== label) small.textContent = label; soldierButton.classList.toggle("soldier-ready", soldierCharges > 0); }
     const mgSmall = $("tbMG")?.querySelector("small");
     if (mgSmall) mgSmall.textContent = T.mgRest > 0 ? `RECARGA ${T.mgRest.toFixed(0)}s` : `${tin.mg || pad.mg || tkeys.has("shift") ? "DISPARO" : "PRONTO"} ${T.mgTimeLeft.toFixed(0)}s`;
     const boss = tz.find((z) => z.d.big && !z.dead);
@@ -5992,6 +6074,7 @@
     ["pointerup","pointercancel","lostpointercapture"].forEach(n=>mgButton.addEventListener(n,up));
   }
   const mineButton=$("tbMine");if(mineButton)mineButton.addEventListener("click",()=>{if(mobileTouch&&MODE==="tank"&&state==="play"){audio();useAcc("mine",T,1);}});
+  const soldiersButton=$("tbSoldiers");if(soldiersButton)soldiersButton.addEventListener("click",()=>{if(mobileTouch&&MODE==="tank"&&state==="play"){audio();deploySoldiers();soldiersButton.classList.toggle("soldier-ready",soldierCharges>0);}});
   $("tpause").addEventListener("click", () => { audio(); togglePause(); });
   $("tOptions").addEventListener("click", () => { audio(); $("tOptionsPanel").hidden = !$("tOptionsPanel").hidden; });
   $("ctlClose").addEventListener("click", () => { $("tOptionsPanel").hidden = true; });
