@@ -2958,7 +2958,7 @@
       tStart();
     } else if (k === "tsetup") showTankPlayers();
     else if (k === "tplayers") { tankPlayers=+(a.dataset.n||1); if(tankPlayers===2) showTankSelect(1); else showTankSetup();
-    } else if (k === "tselect") { const p=+(a.dataset.p||tankSetupPlayer), v=a.dataset.v; if(v){ if(p===1) tcfg.camo=v; else tcfg2.camo=v; showTankSelect(p); return; } if(p===1) showTankSelect(2); else { store.set("tank2",tcfg2); showTankSetup(); }
+    } else if (k === "tselect") { const p=+(a.dataset.p||tankSetupPlayer), v=a.dataset.v, g=a.dataset.g||"camo"; if(v){ if(p===1) tcfg[g]=v; else tcfg2[g]=v; showTankSelect(p); return; } if(p===1) showTankSelect(2); else { store.set("tank2",tcfg2); showTankSetup(); }
     } else if (k === "tgo") {
       store.set("tank", tcfg); store.set("tank2",tcfg2);
       tStart();
@@ -4015,7 +4015,8 @@
   }
   function showTankSelect(player) {
     tankSetupPlayer=player; state="tselect"; const cfg=player===1?tcfg:tcfg2;
-    showOv(`<h2 class="title">JOGADOR ${player}</h2><p class="sub">${player===1?"PC · ENTER PARA CONFIRMAR":"CONTROLE · X PARA CONFIRMAR"}</p><p class="tname">ESCOLHA A COR DO SEU TANQUE</p><div class="topts">${Object.keys(CAMO).map(k=>`<button class="opt${cfg.camo===k?" on":""}" data-a="tselect" data-p="${player}" data-v="${k}"><i class="sw" style="background:${CAMO[k].base}"></i>${CAMO[k].n}</button>`).join("")}</div><p class="hint">${player===1?"Use A/D para trocar a cor e ENTER para confirmar.":"Use o direcional ←/→ e X para confirmar."}</p><button class="big" data-a="tselect" data-p="${player}">CONFIRMAR JOGADOR ${player}</button><button class="alt" data-a="menu">CANCELAR</button>`);
+    const choices=(group,table)=>`<div class="trow"><span class="tlab">${group==="camo"?"COR":group==="chassis"?"MODELO":"CANHÃO"}</span><div class="topts">${Object.keys(table).map(k=>`<button class="opt${cfg[group]===k?" on":""}" data-a="tselect" data-p="${player}" data-g="${group}" data-v="${k}">${group==="camo"?`<i class="sw" style="background:${table[k].base}"></i>`:""}${table[k].n}</button>`).join("")}</div></div>`;
+    showOv(`<h2 class="title">JOGADOR ${player}</h2><p class="sub">${player===1?"PC · ENTER PARA CONFIRMAR":"CONTROLE · X PARA CONFIRMAR"}</p><p class="tname">MONTE SEU TANQUE</p>${choices("camo",CAMO)}${choices("chassis",CHASSIS)}${choices("cannon",CANNON)}<p class="hint">${player===1?"Escolha as opções e aperte ENTER.":"Escolha as opções e aperte X no controle."}</p><button class="big" data-a="tselect" data-p="${player}">CONFIRMAR JOGADOR ${player}</button><button class="alt" data-a="menu">CANCELAR</button>`);
   }
   function showTankSetup() {
     state = "tsetup";
@@ -4611,7 +4612,7 @@
       gp = allPads.find((g) => g && g.connected && g.axes.length >= 2);
       const gp2 = tankPlayers === 2 ? gp : allPads.filter((g) => g && g.connected && g.axes.length >= 2).find((g) => g.index !== (gp && gp.index));
       if (tankPlayers === 2) gp = null;
-      if (gp2) { const dz2=v=>Math.abs(v)<.18?0:v, b2=i=>!!(gp2.buttons[i]&&(gp2.buttons[i].pressed||gp2.buttons[i].value>.4)); pad2.lx=dz2(gp2.axes[0]||0);pad2.ly=dz2(gp2.axes[1]||0);pad2.rx=dz2(gp2.axes[2]||0);pad2.ry=dz2((gp2.mapping==="standard"?gp2.axes[3]:gp2.axes.length>5?gp2.axes[5]:gp2.axes[3])||0);pad2.cannon=b2(7);pad2.mg=b2(5);pad2.id=gp2.id; if(state==="tselect" && tankSetupPlayer===2){const keys=Object.keys(CAMO),i=keys.indexOf(tcfg2.camo);if(b2(14))tcfg2.camo=keys[(i+keys.length-1)%keys.length];if(b2(15))tcfg2.camo=keys[(i+1)%keys.length];if(b2(0)&&!pad2.confirm){pad2.confirm=true;store.set("tank2",tcfg2);showTankSetup();}} else pad2.confirm=false; if(!T2 && MODE==="tank" && state==="play" && T) { const st2=tStats(); T2={x:T.x,y:T.y+52,ang:0,tur:0,vel:0,hp:st2.max,cd:.8,mgCd:0,phase:0,fl:0}; banner("JOGADOR 2 ENTROU NA MISSÃO",2); } } else {pad2.lx=pad2.ly=pad2.rx=pad2.ry=0;pad2.cannon=pad2.mg=false;pad2.id="";}
+      if (gp2) { const dz2=v=>Math.abs(v)<.18?0:v, b2=i=>!!(gp2.buttons[i]&&(gp2.buttons[i].pressed||gp2.buttons[i].value>.4)), edge2=i=>b2(i)&&!pad2.prev[i]; pad2.lx=dz2(gp2.axes[0]||0);pad2.ly=dz2(gp2.axes[1]||0);pad2.rx=dz2(gp2.axes[2]||0);pad2.ry=dz2((gp2.mapping==="standard"?gp2.axes[3]:gp2.axes.length>5?gp2.axes[5]:gp2.axes[3])||0);pad2.cannon=b2(7);pad2.mg=b2(5);pad2.id=gp2.id; if(state==="tselect" && tankSetupPlayer===2){const keys=Object.keys(CAMO),i=keys.indexOf(tcfg2.camo);if(edge2(14))tcfg2.camo=keys[(i+keys.length-1)%keys.length];if(edge2(15))tcfg2.camo=keys[(i+1)%keys.length];if(edge2(0)){store.set("tank2",tcfg2);showTankSetup();}} pad2.prev=gp2.buttons.map((_,i)=>b2(i)); } else {pad2.lx=pad2.ly=pad2.rx=pad2.ry=0;pad2.cannon=pad2.mg=false;pad2.id="";}
     } catch (e) {}
     if (!gp) {
       pad.lx = pad.ly = pad.rx = pad.ry = 0;
