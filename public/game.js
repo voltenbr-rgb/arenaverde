@@ -1,8 +1,8 @@
 /* Arena Verde — lógica do jogo (canvas + Web Audio, sem frameworks) */
 {
   const $ = (id) => document.getElementById(id);
-  // CONFIGURAÇÃO DE MANUTENÇÃO: altere para false ao liberar o jogo ao público.
-  const MODO_MANUTENCAO = false;
+  // CONFIGURAÇÃO DE MANUTENÇÃO: true bloqueia o acesso público; ?dev=1 ou ?teste=1 libera a sessão de teste.
+  const MODO_MANUTENCAO = true;
   const DEV_QUERY = new URLSearchParams(location.search);
   let DEV_BYPASS = DEV_QUERY.get("dev") === "1" || DEV_QUERY.get("teste") === "1";
   try {
@@ -4139,8 +4139,8 @@
  ${optRow("CAMUFLAGEM", "camo", CAMO)}
  ${optRow("CANHÃO", "cannon", CANNON, (o) => o.desc)}
  ${optRow("CHASSI", "chassis", CHASSIS, (o) => o.desc)}
- <p class="hint">PC: W/S frente e ré · A/D giram o tanque · setas ou mouse = torreta · ESPAÇO ou clique esq. = canhão · SHIFT ou clique dir. = metralhadora · E = acessório · Q = fumaça · TAB/roda = troca<br>Controle PS4: analógico esq. frente/ré e giro · analógico dir. torreta · R2 canhão · R1 metralhadora · L1 acessório · L2 fumaça · ←/→ troca · OPTIONS pausa<br>Celular: os mesmos comandos nos analógicos e botões da tela</p>
- <p class="hint">${tankPlayers===2?`JOGADOR 1: ${CAMO[tcfg.camo].n} · JOGADOR 2: ${CAMO[tcfg2.camo].n}`:""}</p><button class="big" data-a="tgo">${camp.m > 0 ? "CONTINUAR CAMPANHA ▶" : "INICIAR CAMPANHA ▶"}</button>${camp.m > 0 ? '<button class="alt" data-a="treset">RECOMEÇAR</button>' : ""}<button class="alt" data-a="menu">VOLTAR</button>`);
+ <p class="hint">${mobileTouch ? "CELULAR: analógico esquerdo para mover · setas para girar a torreta · ATIRAR para disparar · botões de acessórios na lateral" : "PC: W/S frente e ré · A/D giram o tanque · setas ou mouse = torreta · ESPAÇO ou clique esq. = canhão · SHIFT ou clique dir. = metralhadora · E = acessório · Q = fumaça · TAB/roda = troca<br>Controle PS4: analógico esq. frente/ré e giro · analógico dir. torreta · R2 canhão · R1 metralhadora · L1 acessório · L2 fumaça · ←/→ troca · OPTIONS pausa"}</p>
+ <p class="hint">${tankPlayers===2 && !mobileTouch?`JOGADOR 1: ${CAMO[tcfg.camo].n} · JOGADOR 2: ${CAMO[tcfg2.camo].n}`:""}</p><button class="big" data-a="tgo">${camp.m > 0 ? "CONTINUAR CAMPANHA ▶" : "INICIAR CAMPANHA ▶"}</button>${camp.m > 0 ? '<button class="alt" data-a="treset">RECOMEÇAR</button>' : ""}<button class="alt" data-a="menu">VOLTAR</button>`);
     drawPreview(0);
   }
   function drawPreview(time) {
@@ -5652,7 +5652,7 @@
       f2 = T2 ? Math.max(0, T2.hp / st.max) : 0,
       nests = LV.objs.filter((o) => o.nest).length;
     ctx.fillStyle = "rgba(13,18,8,.62)";
-    ctx.fillRect(12, 12, 300, 142);
+    ctx.fillRect(12, 12, mobileTouch ? 300 : 300, mobileTouch && !T2 ? 124 : 142);
     ctx.font = "12px 'Press Start 2P',monospace";
     ctx.fillStyle = "#f2c230";
     ctx.fillText(`MISSÃO ${camp.m + 1}: ${LV.M.n.toUpperCase()}`, 22, 32);
@@ -5669,10 +5669,12 @@
     ctx.fillRect(22, 58, 190 * f, 10);
     ctx.fillStyle = "#e6eed2";
     ctx.fillText(`P1 ${Math.ceil(f * 100)}%`, 220, 68);
-    ctx.fillStyle = "#000"; ctx.fillRect(22, 76, 190, 7);
-    ctx.fillStyle = f2 > .5 ? "#59b9ff" : f2 > .25 ? "#f2c230" : "#e0533a";
-    ctx.fillRect(22, 76, 190 * f2, 7);
-    ctx.fillStyle = "#e6eed2"; ctx.fillText(`P2 ${T2 ? Math.ceil(f2 * 100) : "--"}%`, 220, 84);
+    if (T2 || !mobileTouch) {
+      ctx.fillStyle = "#000"; ctx.fillRect(22, 76, 190, 7);
+      ctx.fillStyle = f2 > .5 ? "#59b9ff" : f2 > .25 ? "#f2c230" : "#e0533a";
+      ctx.fillRect(22, 76, 190 * f2, 7);
+      ctx.fillStyle = "#e6eed2"; ctx.fillText(`P2 ${T2 ? Math.ceil(f2 * 100) : "--"}%`, 220, 84);
+    }
     ctx.fillStyle = "#f2c230";
     ctx.fillText(`${money}  ★${score}`, 22, 102);
     // acessórios: o selecionado (L1/E) em destaque, e a fumaça (L2/Q)
