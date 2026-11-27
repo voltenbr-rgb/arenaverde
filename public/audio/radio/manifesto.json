@@ -1,0 +1,64 @@
+{
+  "projeto": "Arena Verde",
+  "sequencia": "ordem_original",
+  "volume_recomendado": 0.28,
+  "intervalo_minimo_segundos": 18,
+  "observacao": "Os trechos foram separados aproximadamente pelas pausas do áudio original. Não atribuir personagens aos arquivos sem conferência auditiva.",
+  "arquivos": [
+    {
+      "arquivo": "radio_01.mp3",
+      "inicio": 0,
+      "fim": 3.82
+    },
+    {
+      "arquivo": "radio_02.mp3",
+      "inicio": 4.1,
+      "fim": 9.94
+    },
+    {
+      "arquivo": "radio_03.mp3",
+      "inicio": 10.17,
+      "fim": 14.2
+    },
+    {
+      "arquivo": "radio_04.mp3",
+      "inicio": 14.44,
+      "fim": 19.52
+    },
+    {
+      "arquivo": "radio_05.mp3",
+      "inicio": 20.04,
+      "fim": 23.62
+    },
+    {
+      "arquivo": "radio_06.mp3",
+      "inicio": 24.94,
+      "fim": 29.68
+    },
+    {
+      "arquivo": "radio_07.mp3",
+      "inicio": 31.97,
+      "fim": 36.9
+    },
+    {
+      "arquivo": "radio_08.mp3",
+      "inicio": 38.96,
+      "fim": 43.16
+    },
+    {
+      "arquivo": "radio_09.mp3",
+      "inicio": 45.96,
+      "fim": 51.9
+    },
+    {
+      "arquivo": "radio_10.mp3",
+      "inicio": 53.03,
+      "fim": 56.92
+    },
+    {
+      "arquivo": "radio_11.mp3",
+      "inicio": 57.96,
+      "fim": 63.48
+    }
+  ]
+}
