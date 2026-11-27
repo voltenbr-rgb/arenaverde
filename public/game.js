@@ -2698,7 +2698,7 @@
   });
   addEventListener("keydown", (e) => {
     if (e.target.tagName === "INPUT") return;
-    if (MODE === "tank") {
+    if (MODE === "tank" || state === "tselect") {
       const k = e.key.toLowerCase();
       if (state === "tselect" && tankSetupPlayer===1) { const keys=Object.keys(CAMO); if(k==="a"||k==="arrowleft"||k==="d"||k==="arrowright"){e.preventDefault();const i=keys.indexOf(tcfg.camo),n=(i+(k==="a"||k==="arrowleft"?-1:1)+keys.length)%keys.length;tcfg.camo=keys[n];showTankSelect(1);return;} if(k==="enter"){e.preventDefault();showTankSelect(2);return;} }
       if (state === "play" && tKey(e, true)) return;
