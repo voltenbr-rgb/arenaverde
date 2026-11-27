@@ -55,7 +55,10 @@
         <div id="tctl">
           <div id="moveStick" class="virtual-stick" aria-label="Joystick de movimento"><i></i><span>MOVER</span></div>
           <div class="tbtns" data-drag="fire"><button id="tbCannon" aria-label="Manter pressionado para disparar">◎<small>ATIRAR</small></button><button id="tbMG" aria-label="Metralhadora">▤<small>METRALH.</small></button></div>
-          <div class="turret-arrows" aria-label="Girar torreta"><button id="tbTurretLeft" aria-label="Girar torreta à esquerda">↺</button><button id="tbTurretRight" aria-label="Girar torreta à direita">↻</button></div>
+          <div class="turret-touch-group" data-drag="turret">
+            <div id="aimPad" class="turret-touch-pad" role="group" aria-label="Arraste para girar a torreta"><span>GIRAR TORRETA</span><i>↔</i></div>
+            <button id="tbTurretCenter" class="turret-center" aria-label="Centralizar torreta">⊙<small>CENTRO</small></button>
+          </div>
           <div class="tbtns2" data-drag="extra"><button id="tbSpec" aria-label="Usar arma especial">🚀<small>ESPECIAL</small></button><button id="tbSmoke" aria-label="Soltar fumaça">☁<small>FUMAÇA</small></button><button id="tbMine" aria-label="Colocar mina">✹<small>MINA</small></button><button id="tbSwap" aria-label="Alternar arma">⇄</button></div>
           <button id="tOptions" aria-label="Opções dos controles">⚙</button>
           <section id="tOptionsPanel" hidden>
@@ -84,6 +87,6 @@
     <div id="ov"><div class="panel plate" id="panel"></div></div>
     <div id="cardv" hidden role="dialog" aria-label="Carta"><img alt="" /><span>TOQUE PARA FECHAR</span></div>
 
-    <a id="avMultiLink" href="/multiplayer/">⚔ MULTIPLAYER</a>\n    <script src="game.js?v=26" defer></script>
+    <a id="avMultiLink" href="/multiplayer/">⚔ MULTIPLAYER</a>\n    <script src="game.js?v=27" defer></script>
   </body>
 </html>
