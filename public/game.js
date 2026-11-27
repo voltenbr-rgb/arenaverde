@@ -4493,31 +4493,29 @@
     a.ammo--;
     cooldown[k] = ACC[k].cd;
     if (k === "missile") {
-      // sai do lançador no teto, sobe e cai no alvo
-      const tg = player === 2 ? { x: tank.x + Math.cos(tank.tur) * aimDist, y: tank.y + Math.sin(tank.tur) * aimDist } : aimPoint(),
-        side = tank.tur + Math.PI / 2,
+      // míssil em trajetória reta, alinhado à torreta como um disparo de canhão
+      const tg = player === 2
+          ? { x: tank.x + Math.cos(tank.tur) * aimDist, y: tank.y + Math.sin(tank.tur) * aimDist }
+          : aimPoint(),
+        dx = tg.x - tank.x,
+        dy = tg.y - tank.y,
+        ang = Math.atan2(dy, dx),
         cfg = player === 2 ? tcfg2 : tcfg,
-        R = CHASSIS[cfg.chassis].W * 0.35,
-        x0 = tank.x + Math.cos(side) * R * 0.75,
-        y0 = tank.y + Math.sin(side) * R * 0.75,
-        d = Math.hypot(tg.x - x0, tg.y - y0);
-      tp.push({ k: "msl", x0, y0, x: x0, y: y0, tx: tg.x, ty: tg.y, h: 16, t: 0, T: 0.7 + d / 420, vx: 0, vy: 0 });
-      const [a2, b2] = P(x0, y0, 17);
-      for (let i = 0; i < 6; i++)
-        G(GL.sl, a2, b2, {
-          add: false,
-          a: 0.5,
-          smoke: 1,
-          vx: rnd(-14, 14),
-          vy: rnd(-4, 10),
-          r0: 2,
-          r1: rnd(6, 11),
-          life: rnd(0.8, 1.4),
-          drag: 1.5,
-        });
-      G(GL.o, a2, b2, { r0: 4, r1: 8, life: 0.12 });
+        R = CHASSIS[cfg.chassis].W * 0.37,
+        x0 = tank.x + Math.cos(ang) * (R + 10),
+        y0 = tank.y + Math.sin(ang) * (R + 10),
+        d = Math.hypot(tg.x - x0, tg.y - y0) || 1,
+        speed = 560;
+      tp.push({ k: "msl", x0, y0, x: x0, y: y0, tx: tg.x, ty: tg.y, h: 11, t: 0, T: d / speed, vx: Math.cos(ang) * speed, vy: Math.sin(ang) * speed, ang });
+      const [a2, b2] = P(x0, y0, 11);
+      for (let i = 0; i < 9; i++) {
+        const [fx, fy] = P(x0 - Math.cos(ang) * rnd(1, 12), y0 - Math.sin(ang) * rnd(1, 12), 11);
+        G(GL.y, fx, fy, { r0: rnd(2, 4), r1: rnd(5, 9), life: rnd(0.12, 0.24), a: 0.9 });
+        G(GL.o, fx, fy, { r0: 1.5, r1: 3, life: 0.1, a: 0.8 });
+      }
+      G(GL.o, a2, b2, { r0: 5, r1: 11, life: 0.16 });
       sfx("launch");
-      rumble(0.3, 80);
+      rumble(0.45, 110);
     } else if (k === "mine") {
       const x = tank.x - Math.cos(tank.ang) * 18,
         y = tank.y - Math.sin(tank.ang) * 18;
@@ -4593,23 +4591,19 @@
         oy = p.y;
       p.x = p.x0 + (p.tx - p.x0) * f;
       p.y = p.y0 + (p.ty - p.y0) * f;
-      p.h = p.k === "msl" ? 16 * (1 - f) + 95 * Math.sin(Math.PI * f) : 12 * (1 - f) + 30 * Math.sin(Math.PI * f);
+      p.h = p.k === "msl" ? 11 : 12 * (1 - f) + 30 * Math.sin(Math.PI * f);
       p.vx = (p.x - ox) / Math.max(dt, 0.001);
       p.vy = (p.y - oy) / Math.max(dt, 0.001);
       if (p.k === "msl") {
-        const [a, b] = P(p.x, p.y, p.h);
-        G(Math.random() < 0.5 ? GL.sl : GL.sd, a, b, {
-          add: false,
-          a: 0.4,
-          smoke: 1,
-          vx: rnd(-5, 5),
-          vy: rnd(-4, 2),
-          r0: 1.4,
-          r1: rnd(5, 8),
-          life: rnd(0.8, 1.3),
-          drag: 1,
-        });
-        G(GL.o, a, b, { r0: 2.5, r1: 1, life: 0.06 });
+        const [a, b] = P(p.x, p.y, p.h),
+          ang = p.ang || Math.atan2(p.vy, p.vx);
+        // jato contínuo de fogo e faíscas atrás do míssil
+        for (let i = 0; i < 2; i++) {
+          const [fx, fy] = P(p.x - Math.cos(ang) * rnd(2, 9), p.y - Math.sin(ang) * rnd(2, 9), p.h);
+          G(GL.y, fx, fy, { r0: rnd(2.5, 4), r1: rnd(6, 10), life: rnd(0.16, 0.28), a: 0.9 });
+          G(GL.o, fx, fy, { r0: 1.5, r1: 3.5, life: 0.12, a: 0.85 });
+        }
+        G(GL.sl, a, b, { add: false, a: 0.2, smoke: 1, vx: -Math.cos(ang) * 12 + rnd(-3, 3), vy: -Math.sin(ang) * 12 + rnd(-3, 3), r0: 1.5, r1: 4, life: 0.35, drag: 1.2 });
       }
       if (f >= 1) {
         p.dead = true;
