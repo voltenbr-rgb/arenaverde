@@ -3334,14 +3334,17 @@
   let tankPlayers = 1, tankSetupPlayer = 1;
   let tcfg2 = Object.assign({ camo: "verde", cannon: "padrao", chassis: "medio" }, store.get("tank2") || {});
   const tkeys = new Set();
-  const tin = { joy: null, joy2: null, cannon: false, mg: false, touch: false, mouse: null };
+  const tin = { joy: null, joy2: null, cannon: false, mg: false, spec: false, smoke: false, moveUp:false, moveDown:false, moveLeft:false, moveRight:false, aimLeft:false, aimRight:false, touch:false, mouse:null };
   const mobileCfg = Object.assign({ opacity: 78, sensitivity: 100, size: 100, style: "verde" }, store.get("mobileControls") || {});
   function applyMobileCfg() {
     const root = document.documentElement;
     root.style.setProperty("--ctl-opacity", String(mobileCfg.opacity / 100));
     root.style.setProperty("--ctl-size", String(mobileCfg.size / 100));
     root.dataset.ctlstyle = mobileCfg.style;
+    root.classList.toggle("ctl-edit", !!mobileCfg.edit);
     for (const [id, value] of [["ctlOpacity",mobileCfg.opacity],["ctlSensitivity",mobileCfg.sensitivity],["ctlSize",mobileCfg.size],["ctlStyle",mobileCfg.style]]) { const el=$(id); if(el) el.value=value; }
+    const edit=$("ctlEdit"); if(edit) edit.textContent=mobileCfg.edit ? "CONCLUIR POSIÇÃO" : "MOVER BOTÕES";
+    document.querySelectorAll("[data-drag]").forEach(el=>{ const p=mobileCfg.positions?.[el.dataset.drag]; if(p){el.style.left=p.x+"%";el.style.top=p.y+"%";el.style.right="auto";el.style.bottom="auto";} });
   }
   function saveMobileCfg() { store.set("mobileControls", mobileCfg); applyMobileCfg(); }
 
@@ -4028,7 +4031,7 @@
     MODE = "def";
     document.body.classList.remove("tank");
     tkeys.clear();
-    tin.cannon = tin.mg = false;
+    tin.cannon = tin.mg = tin.spec = tin.smoke = tin.moveUp = tin.moveDown = tin.moveLeft = tin.moveRight = tin.aimLeft = tin.aimRight = false;
     tin.joy = tin.joy2 = null;
     try {
       if (document.fullscreenElement) document.exitFullscreen();
@@ -4756,11 +4759,13 @@
     // frente = acelera, trás = ré (sem girar), lados = giram o casco
     let fwd = (tkeys.has("w") ? 1 : 0) - (tkeys.has("s") ? 1 : 0),
       rot = (tkeys.has("d") ? 1 : 0) - (tkeys.has("a") ? 1 : 0);
-    const stick = tin.joy || (pad.lx || pad.ly ? { x: pad.lx, y: pad.ly } : null);
-    if (stick) {
-      const sy = -stick.y, sx = stick.x, sens = mobileCfg.sensitivity / 100;
-      fwd = Math.abs(sy) > 0.12 ? Math.max(-1, Math.min(1, sy * 1.15 * sens)) : 0;
-      rot = Math.abs(sx) > 0.12 ? Math.max(-1, Math.min(1, sx * 1.15 * sens)) : 0;
+    const sens = mobileCfg.sensitivity / 100;
+    if (tin.moveUp || tin.moveDown || tin.moveLeft || tin.moveRight) {
+      fwd = (tin.moveUp ? 1 : 0) - (tin.moveDown ? 1 : 0);
+      rot = (tin.moveRight ? 1 : 0) - (tin.moveLeft ? 1 : 0);
+    } else if (pad.lx || pad.ly) {
+      fwd = Math.abs(pad.ly) > .2 ? -pad.ly : 0;
+      rot = Math.abs(pad.lx) > .2 ? pad.lx : 0;
     }
     T.ang += rot * st.turn * dt;
     const target = fwd * st.speed * (fwd < 0 ? 0.6 : 1);
@@ -4798,13 +4803,12 @@
     // --- torreta: A/D, analógico direito (tela ou controle) ou mouse
     // torreta: setas (direção na tela), analógico direito (tela ou controle) ou mouse
     const ax = (tkeys.has("arrowright") ? 1 : 0) - (tkeys.has("arrowleft") ? 1 : 0),
-      ay = (tkeys.has("arrowdown") ? 1 : 0) - (tkeys.has("arrowup") ? 1 : 0),
-      aim =
-        tin.joy2 || (Math.hypot(pad.rx, pad.ry) > 0.3 ? { x: pad.rx, y: pad.ry } : ax || ay ? { x: ax, y: ay } : null);
-    if (aim && Math.hypot(aim.x, aim.y) > 0.25) {
-      T.tur = turnTo(T.tur, screenToGroundDir(aim.x, aim.y), 4.5 * (mobileCfg.sensitivity / 100) * dt);
-      if (tin.joy2 || pad.rx || pad.ry) aimDist = 90 + 200 * Math.min(1, Math.hypot(aim.x, aim.y)); // empurrar mais = mira mais longe
-    } else if (tin.mouse) T.tur = turnTo(T.tur, Math.atan2(tin.mouse.y - T.y, tin.mouse.x - T.x), 4 * dt);
+      ay = (tkeys.has("arrowdown") ? 1 : 0) - (tkeys.has("arrowup") ? 1 : 0);
+    const turretTurn = (tin.aimRight ? 1 : 0) - (tin.aimLeft ? 1 : 0);
+    if (turretTurn) T.tur += turretTurn * 2.4 * sens * dt;
+    else if (Math.hypot(pad.rx,pad.ry) > .3) T.tur = turnTo(T.tur,screenToGroundDir(pad.rx,pad.ry),4.5*dt);
+    else if (ax || ay) T.tur = turnTo(T.tur,screenToGroundDir(ax,ay),4.5*dt);
+    else if (tin.mouse) T.tur = turnTo(T.tur,Math.atan2(tin.mouse.y-T.y,tin.mouse.x-T.x),4*dt);
     // --- armas
     T.cd -= dt;
     T.mgCd -= dt;
@@ -5795,8 +5799,29 @@
     el.addEventListener("pointercancel", end);
   }
   applyMobileCfg();
-  stickCtl($("joy"), "joy");
-  stickCtl($("joy2"), "joy2");
+  const pressControl = (id, key) => {
+    const b=$(id); if(!b) return;
+    b.addEventListener("pointerdown",e=>{ if(mobileCfg.edit) return; audio(); e.preventDefault(); try{b.setPointerCapture(e.pointerId);}catch(err){} tin[key]=true; tin.touch=true; tin.mouse=null; b.classList.add("on"); });
+    const release=()=>{tin[key]=false;b.classList.remove("on");};
+    b.addEventListener("pointerup",release); b.addEventListener("pointercancel",release); b.addEventListener("lostpointercapture",release);
+  };
+  [["mvUp","moveUp"],["mvDown","moveDown"],["mvLeft","moveLeft"],["mvRight","moveRight"],["aimLeft","aimLeft"],["aimRight","aimRight"],["tbCannon","cannon"],["tbMG","mg"],["tbSpec","spec"],["tbSmoke","smoke"]].forEach(([id,key])=>pressControl(id,key));
+  // Arrastar os grupos para personalizar a posição dos controles.
+  document.querySelectorAll("[data-drag]").forEach(el=>{
+    let drag=null;
+    el.addEventListener("pointerdown",e=>{
+      if(!mobileCfg.edit) return;
+      e.preventDefault(); drag={x:e.clientX,y:e.clientY,left:el.offsetLeft,top:el.offsetTop};
+      try{el.setPointerCapture(e.pointerId)}catch(err){}
+    });
+    el.addEventListener("pointermove",e=>{
+      if(!drag||!mobileCfg.edit) return;
+      const r=$("stage").getBoundingClientRect(), x=Math.max(0,Math.min(r.width-el.offsetWidth,drag.left+e.clientX-drag.x)), y=Math.max(0,Math.min(r.height-el.offsetHeight,drag.top+e.clientY-drag.y));
+      el.style.left=x/r.width*100+"%";el.style.top=y/r.height*100+"%";el.style.right="auto";el.style.bottom="auto";
+    });
+    const finish=()=>{if(!drag)return;const r=$("stage").getBoundingClientRect();mobileCfg.positions=mobileCfg.positions||{};mobileCfg.positions[el.dataset.drag]={x:parseFloat(el.style.left),y:parseFloat(el.style.top)};drag=null;store.set("mobileControls",mobileCfg);};
+    el.addEventListener("pointerup",finish);el.addEventListener("pointercancel",finish);
+  });
   $("tbSwap").addEventListener("click", () => {
     audio();
     cycleSpec(1);
@@ -5833,7 +5858,8 @@
   $("ctlSensitivity").addEventListener("input", e => { mobileCfg.sensitivity = +e.target.value; saveMobileCfg(); });
   $("ctlSize").addEventListener("input", e => { mobileCfg.size = +e.target.value; saveMobileCfg(); });
   $("ctlStyle").addEventListener("change", e => { mobileCfg.style = e.target.value; saveMobileCfg(); });
-  $("ctlReset").addEventListener("click", () => { Object.assign(mobileCfg,{opacity:78,sensitivity:100,size:100,style:"verde"}); saveMobileCfg(); });
+  $("ctlEdit").addEventListener("click",()=>{mobileCfg.edit=!mobileCfg.edit;saveMobileCfg();});
+  $("ctlReset").addEventListener("click",()=>{Object.assign(mobileCfg,{opacity:78,sensitivity:100,size:100,style:"verde",positions:{},edit:false});document.querySelectorAll("[data-drag]").forEach(el=>{el.style.left="";el.style.top="";el.style.right="";el.style.bottom="";});saveMobileCfg();});
 
 
   /* ---------- layout + loop ---------- */
