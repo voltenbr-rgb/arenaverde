@@ -1250,8 +1250,8 @@ html.mobile-controls body.tank #tctl .tbtns button,html.mobile-controls body.tan
 @media(orientation:portrait){html.mobile-controls body.tank #moveStick{width:112px}html.mobile-controls body.tank #tctl .tbtns2{bottom:calc(18px + 112px + 12px)}}
 
 /* v25: botões independentes para rotação manual da torreta no mobile */
-html.mobile-controls body.tank #tctl .turret-arrows{position:absolute;right:max(24px,env(safe-area-inset-right));bottom:calc(max(20px,env(safe-area-inset-bottom)) + clamp(88px,19vmin,116px) + 18px);display:flex;gap:10px;z-index:6;pointer-events:auto}
+html.mobile-controls body.tank #tctl .turret-arrows{position:absolute;right:calc(max(20px,env(safe-area-inset-right)) + clamp(88px,19vmin,116px) + 12px);bottom:max(20px,env(safe-area-inset-bottom));display:flex;gap:8px;z-index:6;pointer-events:auto}
 html.mobile-controls body.tank #tctl .turret-arrows button{width:58px;height:58px;border-radius:15px;border:2px solid #9bdcff;background:#15364dcc;color:#fff;font:900 29px Arial;text-shadow:0 2px 4px #000;box-shadow:0 4px 12px #0009;touch-action:none;user-select:none;-webkit-user-select:none}
 html.mobile-controls body.tank #tctl .turret-arrows button.on{background:#2874a8;filter:brightness(1.35);transform:scale(.94)}
 html.mobile-controls body.tank #tbCannon{touch-action:none}
-@media(orientation:portrait){html.mobile-controls body.tank #tctl .turret-arrows{right:8px;bottom:calc(18px + 112px + 12px)}}
+@media(orientation:portrait){html.mobile-controls body.tank #tctl .turret-arrows{right:calc(8px + 88px + 8px);bottom:18px}}
