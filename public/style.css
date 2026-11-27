@@ -1232,3 +1232,19 @@ html.ctl-edit body.tank #tctl [data-drag]::after{content:"ARRASTE";position:abso
  body.tank #tctl .tbtns2{right:5%;bottom:calc(8% + 78px)}
 }
 @media(pointer:fine){body.tank #tctl{display:none!important}}
+
+/* Touchscreen isolado: desktop não recebe estas regras. */
+html.mobile-controls body.tank #tctl{display:block;pointer-events:none;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+html.mobile-controls body.tank #cv,html.mobile-controls body.tank #stage,html.mobile-controls body.tank #tctl,html.mobile-controls body.tank #tctl button{touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+html.mobile-controls body.tank #tkeys,html.mobile-controls body.tank #avMultiLink{display:none!important}
+html.mobile-controls body.tank #moveStick{display:block;position:absolute;left:max(22px,env(safe-area-inset-left));bottom:max(22px,env(safe-area-inset-bottom));width:clamp(126px,25vmin,170px);aspect-ratio:1;border-radius:50%;background:rgba(18,30,14,.62);border:2px solid #d9edc1a8;box-shadow:0 5px 20px #0009;pointer-events:auto;touch-action:none;opacity:var(--ctl-opacity)}
+html.mobile-controls body.tank #moveStick i{position:absolute;left:50%;top:50%;width:42%;height:42%;margin:-21% 0 0 -21%;border-radius:50%;background:rgba(190,220,160,.65);border:2px solid #efffe0;box-shadow:0 2px 9px #0009}
+html.mobile-controls body.tank #moveStick span{position:absolute;left:0;right:0;bottom:10%;text-align:center;color:#fff9;font:700 8px Arial;text-shadow:0 1px 3px #000;pointer-events:none}
+html.mobile-controls body.tank #tctl .tbtns{right:max(20px,env(safe-area-inset-right));bottom:max(20px,env(safe-area-inset-bottom));gap:10px;z-index:5}
+html.mobile-controls body.tank #tbCannon{width:clamp(88px,19vmin,116px);height:clamp(88px,19vmin,116px);border-radius:50%;background:#d6961999!important;border:3px solid #ffe08a!important;touch-action:none}
+html.mobile-controls body.tank #tbMG{width:58px;height:58px;border-radius:50%;touch-action:none}
+html.mobile-controls body.tank #tctl .tbtns2{right:max(24px,env(safe-area-inset-right));bottom:calc(max(22px,env(safe-area-inset-bottom)) + clamp(98px,20vmin,126px) + 18px);gap:8px;z-index:5}
+html.mobile-controls body.tank #tctl .tbtns2 button{min-width:54px;min-height:54px;padding:5px;border-radius:14px;font-size:19px}
+html.mobile-controls body.tank #tbMine{background:#7c6336bb;border-color:#d9bd7d}
+html.mobile-controls body.tank #tctl .tbtns button,html.mobile-controls body.tank #tctl .tbtns2 button{opacity:var(--ctl-opacity)}
+@media(orientation:portrait){html.mobile-controls body.tank #moveStick{width:112px}html.mobile-controls body.tank #tctl .tbtns2{bottom:calc(18px + 112px + 12px)}}
