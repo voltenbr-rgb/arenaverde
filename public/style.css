@@ -1251,10 +1251,10 @@ html.mobile-controls body.tank #tctl .tbtns button,html.mobile-controls body.tan
 
 /* v26: painel de toque para girar a torreta, centralizar e disparar juntos */
 html.mobile-controls body.tank #tctl .turret-touch-group{position:absolute;right:calc(max(20px,env(safe-area-inset-right)) + clamp(88px,19vmin,116px) + 14px);bottom:max(20px,env(safe-area-inset-bottom));display:flex;align-items:center;gap:7px;z-index:6;pointer-events:auto}
-html.mobile-controls body.tank #tctl .turret-touch-pad{width:clamp(94px,22vmin,116px);height:64px;border:2px solid #9bdcff;border-radius:16px;background:#15364dcc;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;touch-action:none;user-select:none;-webkit-user-select:none;box-shadow:0 4px 12px #0009}
-html.mobile-controls body.tank #tctl .turret-touch-pad span{font:700 8px Arial;letter-spacing:.4px;text-shadow:0 2px 3px #000}
-html.mobile-controls body.tank #tctl .turret-touch-pad i{font:900 26px Arial;font-style:normal;line-height:1}
-html.mobile-controls body.tank #tctl .turret-touch-pad.active{background:#2874a8;filter:brightness(1.3)}
+html.mobile-controls body.tank #tctl .turret-touch-pad{width:clamp(126px,29vmin,154px);height:64px;border:2px solid #9bdcff;border-radius:16px;background:#15364dcc;color:#fff;display:flex;align-items:center;justify-content:space-evenly;gap:3px;touch-action:none;user-select:none;-webkit-user-select:none;box-shadow:0 4px 12px #0009}
+html.mobile-controls body.tank #tctl .turret-touch-pad span{font:700 8px Arial;letter-spacing:.3px;text-shadow:0 2px 3px #000}
+html.mobile-controls body.tank #tctl .turret-touch-pad button{width:48px;height:48px;border:1px solid #bde8ff;border-radius:12px;background:#24577dcc;color:#fff;font:900 20px Arial;touch-action:none;user-select:none}
+html.mobile-controls body.tank #tctl .turret-touch-pad button.active{background:#2874a8;filter:brightness(1.4);transform:scale(.94)}
 html.mobile-controls body.tank #tctl .turret-center{width:56px;height:56px;border-radius:14px;border:2px solid #b7e3ff;background:#17466add;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;font:900 25px Arial;touch-action:manipulation}
 html.mobile-controls body.tank #tctl .turret-center small{font:700 7px Arial}
 html.mobile-controls body.tank #tctl .turret-center.on{filter:brightness(1.5);transform:scale(.94)}
