@@ -4920,7 +4920,7 @@
     if (mobileTouch && Math.hypot(tin.joyX, tin.joyY) > 0.08) {
       // O vetor do stick define uma direção absoluta no mapa; o veículo sempre avança de frente.
       const magnitude = Math.min(1, Math.hypot(tin.joyX, tin.joyY));
-      const desiredHeading = Math.atan2(tin.joyY, tin.joyX);
+      const desiredHeading = screenToGroundDir(tin.joyX, tin.joyY);
       T.ang = turnTo(T.ang, desiredHeading, st.turn * 1.8 * dt);
       fwd = magnitude; rot = 0;
     } else { T.ang += rot * st.turn * dt; }
@@ -5854,7 +5854,7 @@
     ctx.fillRect(22, 58, 190 * f, 10);
     ctx.fillStyle = "#e6eed2";
     ctx.fillText(`P1 ${Math.ceil(f * 100)}%`, 220, 68);
-    if (T2 || !mobileTouch) {
+    if (!mobileTouch) {
       ctx.fillStyle = "#000"; ctx.fillRect(22, 76, 190, 7);
       ctx.fillStyle = f2 > .5 ? "#59b9ff" : f2 > .25 ? "#f2c230" : "#e0533a";
       ctx.fillRect(22, 76, 190 * f2, 7);
@@ -5914,7 +5914,7 @@
     if ($("tbSpec").textContent !== sl) $("tbSpec").textContent = sl;
     if ($("tbSmoke").textContent !== fl) $("tbSmoke").textContent = fl;
     const soldierButton = $("tbSoldiers");
-    if (soldierButton) { soldierButton.innerHTML = `🪖<small>SOLDADOS ${soldierCharges} · ${tSoldiers.length}/2</small>`; soldierButton.classList.toggle("soldier-ready", soldierCharges > 0); }
+    if (soldierButton) { const small = soldierButton.querySelector("small"), label = `SOLDADOS ${soldierCharges} · ${tSoldiers.length}/2`; if (small && small.textContent !== label) small.textContent = label; soldierButton.classList.toggle("soldier-ready", soldierCharges > 0); }
     const mgSmall = $("tbMG")?.querySelector("small");
     if (mgSmall) mgSmall.textContent = T.mgRest > 0 ? `RECARGA ${T.mgRest.toFixed(0)}s` : `${tin.mg || pad.mg || tkeys.has("shift") ? "DISPARO" : "PRONTO"} ${T.mgTimeLeft.toFixed(0)}s`;
     const boss = tz.find((z) => z.d.big && !z.dead);
