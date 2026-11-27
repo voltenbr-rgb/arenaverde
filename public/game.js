@@ -5482,9 +5482,10 @@
     ctx.setTransform(FS, 0, 0, FS, 0, 0);
     const st = tStats(),
       f = Math.max(0, T.hp / st.max),
+      f2 = T2 ? Math.max(0, T2.hp / st.max) : 0,
       nests = LV.objs.filter((o) => o.nest).length;
     ctx.fillStyle = "rgba(13,18,8,.62)";
-    ctx.fillRect(12, 12, 300, 118);
+    ctx.fillRect(12, 12, 300, 142);
     ctx.font = "12px 'Press Start 2P',monospace";
     ctx.fillStyle = "#f2c230";
     ctx.fillText(`MISSÃO ${camp.m + 1}: ${LV.M.n.toUpperCase()}`, 22, 32);
@@ -5500,9 +5501,13 @@
     ctx.fillStyle = f > 0.5 ? "#6ee04a" : f > 0.25 ? "#f2c230" : "#e0533a";
     ctx.fillRect(22, 58, 190 * f, 10);
     ctx.fillStyle = "#e6eed2";
-    ctx.fillText(`${Math.ceil(f * 100)}%`, 220, 68);
+    ctx.fillText(`P1 ${Math.ceil(f * 100)}%`, 220, 68);
+    ctx.fillStyle = "#000"; ctx.fillRect(22, 76, 190, 7);
+    ctx.fillStyle = f2 > .5 ? "#59b9ff" : f2 > .25 ? "#f2c230" : "#e0533a";
+    ctx.fillRect(22, 76, 190 * f2, 7);
+    ctx.fillStyle = "#e6eed2"; ctx.fillText(`P2 ${T2 ? Math.ceil(f2 * 100) : "--"}%`, 220, 84);
     ctx.fillStyle = "#f2c230";
-    ctx.fillText(`$${money}  ★${score}`, 22, 90);
+    ctx.fillText(`${money}  ★${score}`, 22, 102);
     // acessórios: o selecionado (L1/E) em destaque, e a fumaça (L2/Q)
     ctx.font = "9px 'Press Start 2P',monospace";
     let ax0 = 22;
