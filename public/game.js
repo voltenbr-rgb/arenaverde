@@ -4265,10 +4265,24 @@
     for (const a of tSoldiers) {
       if (a.dead) continue;
       a.t += dt; a.fl = Math.max(0, a.fl - dt); a.cd -= dt;
+      // Acompanhamento terrestre: os aliados caminham até uma posição atrás do tanque,
+      // com velocidade própria, em vez de deslizar/orbitar instantaneamente ao redor dele.
       const back = T.ang + Math.PI, lateral = T.ang + (a.side < 0 ? -Math.PI/2 : Math.PI/2);
-      const tx = T.x + Math.cos(back)*25 + Math.cos(lateral)*17;
-      const ty = T.y + Math.sin(back)*25 + Math.sin(lateral)*17;
-      a.x += (tx-a.x) * Math.min(1, dt*4.2); a.y += (ty-a.y) * Math.min(1, dt*4.2);
+      const tx = T.x + Math.cos(back)*34 + Math.cos(lateral)*15;
+      const ty = T.y + Math.sin(back)*34 + Math.sin(lateral)*15;
+      const dxFollow = tx-a.x, dyFollow = ty-a.y, distFollow = Math.hypot(dxFollow,dyFollow);
+      const followSpeed = 58;
+      if (distFollow > 7) {
+        const step = Math.min(distFollow-7, followSpeed*dt);
+        a.x += dxFollow/distFollow*step;
+        a.y += dyFollow/distFollow*step;
+        a.walkAng = Math.atan2(dyFollow,dxFollow);
+        a.walking = true;
+        a.walkT = (a.walkT || 0) + dt * 10;
+      } else {
+        a.walking = false;
+        a.walkT = 0;
+      }
       let target = null, best = 245;
       for (const z of tz) if (!z.dead) { const d=Math.hypot(z.x-a.x,z.y-a.y); if(d<best){best=d;target=z;} }
       if (target) {
@@ -4945,17 +4959,21 @@
     updateAlliedSoldiers(dt);
     // --- torreta: mobile = setas dedicadas; desktop = cursor do mouse/controle
     const turretTurn = (tin.aimRight ? 1 : 0) - (tin.aimLeft ? 1 : 0) + (tkeys.has("arrowright") ? 1 : 0) - (tkeys.has("arrowleft") ? 1 : 0);
-    if (mobileTouch) {
-      if (turretTurn) { T.centering = false; T.tur += turretTurn * 2.0 * sens * dt; }
+    // Centralizar tem prioridade sobre qualquer comando de giro/mira enquanto estiver ativo.
+    // Assim o botão funciona em movimento e também com o dedo ainda pressionando a rotação.
+    if (T.centering) {
+      T.tur = turnTo(T.tur, T.ang, 5.5 * dt);
+      if (Math.abs(angDiff(T.ang, T.tur)) < 0.012) { T.tur = T.ang; T.centering = false; }
+    } else if (mobileTouch) {
+      if (turretTurn) T.tur += turretTurn * 2.0 * sens * dt;
       // Sem mira automática por toque ou movimento: mantém o ângulo relativo ao chassi.
     } else if (turretTurn) {
-      T.centering = false; T.tur += turretTurn * 2.0 * dt;
+      T.tur += turretTurn * 2.0 * dt;
     } else if (Math.hypot(pad.rx,pad.ry) > .3) {
-      T.centering = false; T.tur = turnTo(T.tur,screenToGroundDir(pad.rx,pad.ry),4.5*dt);
+      T.tur = turnTo(T.tur,screenToGroundDir(pad.rx,pad.ry),4.5*dt);
     } else if (tin.mouse) {
-      T.centering = false; T.tur = turnTo(T.tur,Math.atan2(tin.mouse.y-T.y,tin.mouse.x-T.x),4*dt);
+      T.tur = turnTo(T.tur,Math.atan2(tin.mouse.y-T.y,tin.mouse.x-T.x),4*dt);
     }
-    if (T.centering) { T.tur = turnTo(T.tur, T.ang, 2.6 * dt); if (Math.abs(angDiff(T.ang, T.tur)) < 0.012) { T.tur = T.ang; T.centering = false; } }
     // --- armas
     T.cd -= dt;
     T.mgCd -= dt;
@@ -5700,7 +5718,19 @@
         -1,
       );
     for (const a of tSoldiers) push(a.x, a.y, () => {
-      scr(); const [sx, sy] = wiso(a.x, a.y); ctx.save(); ctx.translate(sx, sy - 15*K); ctx.rotate(a.aim || 0); ctx.drawImage(FR.rifle.idle, -9*K, -8*K, 18*K, 16*K); ctx.restore(); bar(sx, sy - 20*K, a.hp, a.max);
+      scr();
+      const [sx, sy] = wiso(a.x, a.y);
+      // Sombra no chão e sprite ancorado pelos pés no ponto real do terreno.
+      shadow(sx, sy, 7*K);
+      const facing = a.aim != null && tz.some(z => !z.dead && Math.hypot(z.x-a.x,z.y-a.y)<245)
+        ? a.aim : (a.walking ? a.walkAng : (a.aim || T.ang));
+      const bob = a.walking ? Math.abs(Math.sin(a.walkT || 0)) * 0.45*K : 0;
+      ctx.save();
+      ctx.translate(sx, sy + bob);
+      ctx.rotate(facing || 0);
+      ctx.drawImage(FR.rifle.idle, -9*K, -16*K, 18*K, 16*K);
+      ctx.restore();
+      bar(sx, sy - 20*K, a.hp, a.max);
     }, 0.4);
     for (const c of tdrops)
       push(c.x, c.y, () => {
