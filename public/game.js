@@ -4486,7 +4486,7 @@
   const ACC = {
     missile: { n:"Míssil leve", desc:"Salva de foguetes guiada pela direção da mira", unlock:150, pack:4, packCost:90, max:12, cd:1.1 },
     mortar: { n:"Morteiro explosivo", desc:"Projétil em arco com explosão de fragmentação em área", unlock:180, pack:3, packCost:95, max:9, cd:2.0 },
-    flame: { n:"Lança-chamas", desc:"Jato incendiário de curto alcance que atravessa alvos", unlock:160, pack:4, packCost:85, max:12, cd:1.25 },
+    flame: { n:"Lança-chamas", desc:"Rajada incendiária de curto alcance em leque", unlock:160, pack:4, packCost:85, max:12, cd:1.25 },
     shock: { n:"Pulso de choque", desc:"Onda sônica ao redor do tanque que fere e paralisa zumbis", unlock:210, pack:2, packCost:110, max:6, cd:3.0 },
     heavy: { n:"Míssil pesado", desc:"Projétil raro de trajetória reta e explosão poderosa", unlock:0, pack:0, packCost:0, max:4, cd:2.2 },
     mine: { n: "Minas", desc: "Solta uma mina atrás do tanque", unlock: 120, pack: 3, packCost: 70, max: 9, cd: 0.7 },
@@ -4510,7 +4510,7 @@
     mine: { own: false, ammo: 0 },
     smoke: { own: false, ammo: 0 },
   });
-  const cloneAcc = (a) => JSON.parse(JSON.stringify(a || accDefault()));
+  const cloneAcc = (a) => Object.assign(accDefault(), JSON.parse(JSON.stringify(a || {})));
   let acc = accDefault(),
     specSel = "missile",
     specSel2 = "missile",
@@ -4656,7 +4656,8 @@
       if (SPECIALS.includes(k)) specSel = k;
       banner(`NOVO ACESSÓRIO: ${ACC[k].n.toUpperCase()}! (${k === "smoke" ? "L2 / Q" : "L1 / E"})`, 2.6);
     } else {
-      k = Object.keys(ACC).filter((k) => k !== "heavy")[(Math.random() * 3) | 0];
+      const available = Object.keys(ACC).filter((key) => key !== "heavy");
+      k = available[(Math.random() * available.length) | 0];
       acc[k].ammo = Math.min(ACC[k].max, acc[k].ammo + ACC[k].pack);
       banner(`+${ACC[k].pack} ${ACC[k].n.toUpperCase()}`, 1.6);
     }
@@ -4830,7 +4831,10 @@
       if(pad2.cannon&&T2.cd<=0){const dx2=Math.cos(T2.tur),dy2=Math.sin(T2.tur),xx=T2.x+dx2*(c2.len+18),yy=T2.y+dy2*(c2.len+18);tp.push({k:"shell",x:xx,y:yy,h:9.8,vx:dx2*c2.speed,vy:dy2*c2.speed,life:c2.range/c2.speed,dmg:st2.dmg,splash:c2.splash,bk:c2.k,owner:2});T2.cd=st2.reload;sfx("cannon");}
       T2.mgRest = Math.max(0, (T2.mgRest || 0) - dt);
       if (T2.mgRest <= 0 && (T2.mgTimeLeft || 0) <= 0) T2.mgTimeLeft = st2.mgDuration;
-      if(pad2.mg && T2.mgRest<=0 && T2.mgTimeLeft>0 && T2.mgCd<=0){const a2=T2.tur+(Math.random()-.5)*.08;tp.push({k:"mg",x:T2.x+Math.cos(a2)*15,y:T2.y+Math.sin(a2)*15,h:12,vx:Math.cos(a2)*560,vy:Math.sin(a2)*560,life:.5,dmg:st2.mgDmg,owner:2});T2.mgCd=.085;T2.mgTimeLeft=Math.max(0,T2.mgTimeLeft-dt);if(T2.mgTimeLeft<=0)T2.mgRest=10;}
+      if (pad2.mg && T2.mgRest <= 0 && T2.mgTimeLeft > 0) {
+        if (T2.mgCd <= 0) { const a2=T2.tur+(Math.random()-.5)*.08; tp.push({k:"mg",x:T2.x+Math.cos(a2)*15,y:T2.y+Math.sin(a2)*15,h:12,vx:Math.cos(a2)*560,vy:Math.sin(a2)*560,life:.5,dmg:st2.mgDmg,owner:2}); T2.mgCd=.085; }
+        T2.mgTimeLeft = Math.max(0, T2.mgTimeLeft - dt); if (T2.mgTimeLeft <= 0) T2.mgRest = 10;
+      }
       if(pad2.spec) useAcc(specSel2,T2,2);
       if(pad2.smoke) useAcc("smoke",T2,2);
     }
@@ -4888,10 +4892,12 @@
       engine.o.frequency.setTargetAtTime(36 + 34 * f, AC.currentTime, 0.1);
     }
     // --- torreta: mobile = setas dedicadas; desktop = cursor do mouse/controle
-    const turretTurn = (tin.aimRight ? 1 : 0) - (tin.aimLeft ? 1 : 0);
+    const turretTurn = (tin.aimRight ? 1 : 0) - (tin.aimLeft ? 1 : 0) + (tkeys.has("arrowright") ? 1 : 0) - (tkeys.has("arrowleft") ? 1 : 0);
     if (mobileTouch) {
       if (turretTurn) { T.centering = false; T.tur += turretTurn * 2.0 * sens * dt; }
       // Sem mira automática por toque ou movimento: mantém o ângulo relativo ao chassi.
+    } else if (turretTurn) {
+      T.centering = false; T.tur += turretTurn * 2.0 * dt;
     } else if (Math.hypot(pad.rx,pad.ry) > .3) {
       T.centering = false; T.tur = turnTo(T.tur,screenToGroundDir(pad.rx,pad.ry),4.5*dt);
     } else if (tin.mouse) {
@@ -4908,8 +4914,9 @@
     const wantCannon = tin.cannon || pad.cannon || tkeys.has(" "),
       wantMG = tin.mg || pad.mg || tkeys.has("shift");
     if (wantCannon && T.cd <= 0) fireCannon(st);
-    if (wantMG && T.mgRest <= 0 && T.mgTimeLeft > 0 && T.mgCd <= 0) {
-      fireMG(st); T.mgTimeLeft = Math.max(0, T.mgTimeLeft - dt);
+    if (wantMG && T.mgRest <= 0 && T.mgTimeLeft > 0) {
+      if (T.mgCd <= 0) fireMG(st);
+      T.mgTimeLeft = Math.max(0, T.mgTimeLeft - dt);
       if (T.mgTimeLeft <= 0) { T.mgRest = 10; banner("METRALHADORA EM RECARGA · 10s", 1.2); }
     }
     if (tin.spec || pad.spec || tkeys.has("e")) useAcc(specSel,T,1);
