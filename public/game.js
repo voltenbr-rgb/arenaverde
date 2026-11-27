@@ -1,15 +1,10 @@
 /* Arena Verde — lógica do jogo (canvas + Web Audio, sem frameworks) */
 {
   const $ = (id) => document.getElementById(id);
-  // CONFIGURAÇÃO DE MANUTENÇÃO: true bloqueia o acesso público; ?dev=1 ou ?teste=1 libera a sessão de teste.
-  const MODO_MANUTENCAO = true;
-  const DEV_QUERY = new URLSearchParams(location.search);
-  let DEV_BYPASS = DEV_QUERY.get("dev") === "1" || DEV_QUERY.get("teste") === "1";
-  try {
-    if (DEV_BYPASS) sessionStorage.setItem("arenaverde.devBypass", "1");
-    else DEV_BYPASS = sessionStorage.getItem("arenaverde.devBypass") === "1";
-  } catch (e) {}
-  if (MODO_MANUTENCAO && !DEV_BYPASS) {
+  // ATIVE temporariamente como true somente durante uma publicação/manutenção.
+  // Em funcionamento normal, deixe false: o jogo abre sem ?dev=1 ou ?teste=1.
+  const MODO_MANUTENCAO = false;
+  if (MODO_MANUTENCAO) {
     const gate = document.createElement("section");
     gate.id = "maintenanceGate";
     gate.setAttribute("role", "alert");
