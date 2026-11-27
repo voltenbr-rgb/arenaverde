@@ -1,6 +1,25 @@
 /* Arena Verde — lógica do jogo (canvas + Web Audio, sem frameworks) */
 {
   const $ = (id) => document.getElementById(id);
+  // CONFIGURAÇÃO DE MANUTENÇÃO: altere para false ao liberar o jogo ao público.
+  const MODO_MANUTENCAO = true;
+  const DEV_QUERY = new URLSearchParams(location.search);
+  let DEV_BYPASS = DEV_QUERY.get("dev") === "1" || DEV_QUERY.get("teste") === "1";
+  try {
+    if (DEV_BYPASS) sessionStorage.setItem("arenaverde.devBypass", "1");
+    else DEV_BYPASS = sessionStorage.getItem("arenaverde.devBypass") === "1";
+  } catch (e) {}
+  if (MODO_MANUTENCAO && !DEV_BYPASS) {
+    const gate = document.createElement("section");
+    gate.id = "maintenanceGate";
+    gate.setAttribute("role", "alert");
+    gate.innerHTML = '<div class="maintenance-card"><div class="maintenance-mark">⚙</div><p class="maintenance-kicker">ARENA VERDE · SISTEMA TÁTICO</p><h1>EM MANUTENÇÃO</h1><p>Estamos realizando melhorias e ajustes no campo de batalha. Voltaremos em breve.</p><span>AGUARDE · ATUALIZAÇÃO EM ANDAMENTO</span></div>';
+    Object.assign(gate.style, {position:"fixed",inset:"0",zIndex:"2147483647",display:"grid",placeItems:"center",padding:"24px",background:"radial-gradient(ellipse at center,#26351d 0%,#0b1008 72%)",color:"#edf5df",fontFamily:"Arial,sans-serif",textAlign:"center"});
+    const style = document.createElement("style");
+    style.textContent = '#maintenanceGate .maintenance-card{width:min(520px,100%);padding:38px 26px;border:1px solid #9eb77b88;border-radius:18px;background:#111b10ee;box-shadow:0 18px 70px #000b}#maintenanceGate .maintenance-mark{font-size:42px;color:#d6e9a5}#maintenanceGate .maintenance-kicker{font-size:11px;letter-spacing:3px;color:#a9c77d}#maintenanceGate h1{font-size:clamp(28px,7vw,46px);letter-spacing:2px;margin:18px 0;color:#f2d36e}#maintenanceGate p:not(.maintenance-kicker){font-size:15px;line-height:1.6;color:#d3ddc6}#maintenanceGate span{display:inline-block;margin-top:18px;font-size:10px;letter-spacing:2px;color:#9db77c}';
+    document.head.appendChild(style);
+    document.body.appendChild(gate);
+  }
   const mobileTouch = new URLSearchParams(location.search).get("mobile") === "1" || (matchMedia("(pointer: coarse)").matches && matchMedia("(max-width: 1100px)").matches);
   document.documentElement.classList.toggle("mobile-controls", mobileTouch);
   const cv = $("cv"),
@@ -3337,6 +3356,7 @@
   let tcfg2 = Object.assign({ camo: "verde", cannon: "padrao", chassis: "medio" }, store.get("tank2") || {});
   const tkeys = new Set();
   const tin = { joy: null, joy2: null, joyX:0, joyY:0, cannon: false, mg: false, spec: false, smoke: false, moveUp:false, moveDown:false, moveLeft:false, moveRight:false, aimLeft:false, aimRight:false, touch:false, mouse:null };
+  let mobileLastHullAngle = null;
   const mobileCfg = Object.assign({ opacity: 78, sensitivity: 100, size: 100, style: "verde" }, store.get("mobileControls") || {});
   function applyMobileCfg() {
     const root = document.documentElement;
@@ -3997,6 +4017,7 @@
       phase: 0,
       fl: 0,
     };
+    mobileLastHullAngle = T.ang;
     T2 = tankPlayers === 2 ? { x: T.x, y: T.y + 58, ang: 0, tur: 0, vel: 0, hp: Math.round(CHASSIS[tcfg2.chassis].hp * (1 + 0.2 * (lv.armor || 0))), cd: 0.8, mgCd: 0, phase: 0, fl: 0 } : null;
     tz = [];
     tp = [];
@@ -4773,6 +4794,11 @@
       rot = Math.abs(pad.lx) > .2 ? pad.lx : 0;
     }
     T.ang += rot * st.turn * dt;
+    if (mobileTouch) {
+      if (mobileLastHullAngle == null) mobileLastHullAngle = T.ang;
+      T.tur += T.ang - mobileLastHullAngle; // conserva o ângulo relativo entre torreta e chassi
+      mobileLastHullAngle = T.ang;
+    }
     const target = fwd * st.speed * (fwd < 0 ? 0.6 : 1);
     T.vel += (target - T.vel) * Math.min(1, dt * 5);
     const nx = T.x + Math.cos(T.ang) * T.vel * dt,
@@ -4805,15 +4831,16 @@
       engine.g.gain.setTargetAtTime(sound ? 0.05 + 0.1 * f : 0, AC.currentTime, 0.08);
       engine.o.frequency.setTargetAtTime(36 + 34 * f, AC.currentTime, 0.1);
     }
-    // --- torreta: A/D, analógico direito (tela ou controle) ou mouse
-    // torreta: setas (direção na tela), analógico direito (tela ou controle) ou mouse
-    const ax = (tkeys.has("arrowright") ? 1 : 0) - (tkeys.has("arrowleft") ? 1 : 0),
-      ay = (tkeys.has("arrowdown") ? 1 : 0) - (tkeys.has("arrowup") ? 1 : 0);
+    // --- torreta: mobile = setas dedicadas; desktop = cursor do mouse/controle
     const turretTurn = (tin.aimRight ? 1 : 0) - (tin.aimLeft ? 1 : 0);
-    if (turretTurn) T.tur += turretTurn * 2.4 * sens * dt;
-    else if (Math.hypot(pad.rx,pad.ry) > .3) T.tur = turnTo(T.tur,screenToGroundDir(pad.rx,pad.ry),4.5*dt);
-    else if (ax || ay) T.tur = turnTo(T.tur,screenToGroundDir(ax,ay),4.5*dt);
-    else if (tin.mouse) T.tur = turnTo(T.tur,Math.atan2(tin.mouse.y-T.y,tin.mouse.x-T.x),4*dt);
+    if (mobileTouch) {
+      if (turretTurn) T.tur += turretTurn * 2.0 * sens * dt;
+      // Sem mira automática por toque ou movimento: mantém o ângulo relativo ao chassi.
+    } else if (Math.hypot(pad.rx,pad.ry) > .3) {
+      T.tur = turnTo(T.tur,screenToGroundDir(pad.rx,pad.ry),4.5*dt);
+    } else if (tin.mouse) {
+      T.tur = turnTo(T.tur,Math.atan2(tin.mouse.y-T.y,tin.mouse.x-T.x),4*dt);
+    }
     // --- armas
     T.cd -= dt;
     T.mgCd -= dt;
@@ -5808,11 +5835,16 @@
     ["pointerup","pointercancel","lostpointercapture"].forEach(n=>moveStick.addEventListener(n,up));
   }
   const aimFire=$("tbCannon");
-  if(aimFire){let pid=null;const aimAt=e=>{const r=cv.getBoundingClientRect(),sx=(e.clientX-r.left)*VIEW.w/r.width+cam.x,sy=(e.clientY-r.top)*VIEW.h/r.height+cam.y;tin.mouse=wunproject(sx,sy);tin.touch=true;};
-    aimFire.addEventListener("pointerdown",e=>{if(!mobileTouch||MODE!=="tank"||state!=="play")return;e.preventDefault();audio();pid=e.pointerId;aimFire.setPointerCapture(pid);tin.cannon=true;aimFire.classList.add("on");aimAt(e);});
-    aimFire.addEventListener("pointermove",e=>{if(e.pointerId===pid){e.preventDefault();aimAt(e);}});
+  if(aimFire){let pid=null;aimFire.addEventListener("pointerdown",e=>{if(!mobileTouch||MODE!=="tank"||state!=="play"||pid!==null)return;e.preventDefault();audio();pid=e.pointerId;aimFire.setPointerCapture(pid);tin.cannon=true;aimFire.classList.add("on");});
     const up=e=>{if(e.pointerId!==pid)return;pid=null;tin.cannon=false;aimFire.classList.remove("on");};["pointerup","pointercancel","lostpointercapture"].forEach(n=>aimFire.addEventListener(n,up));
   }
+  // Setas dedicadas: rotação contínua e multitouch independente por pointerId.
+  [["tbTurretLeft","aimLeft"],["tbTurretRight","aimRight"]].forEach(([id,key])=>{
+    const button=$(id); if(!button)return; const active=new Set();
+    button.addEventListener("pointerdown",e=>{if(!mobileTouch||MODE!=="tank"||state!=="play")return;e.preventDefault();audio();active.add(e.pointerId);button.setPointerCapture(e.pointerId);tin[key]=true;button.classList.add("on");});
+    const release=e=>{if(!active.has(e.pointerId))return;active.delete(e.pointerId);tin[key]=active.size>0;button.classList.toggle("on",tin[key]);};
+    ["pointerup","pointercancel","lostpointercapture"].forEach(n=>button.addEventListener(n,release));
+  });
   const mgButton=$("tbMG");
   if(mgButton){let pid=null;mgButton.addEventListener("pointerdown",e=>{if(!mobileTouch||MODE!=="tank"||state!=="play")return;e.preventDefault();audio();pid=e.pointerId;mgButton.setPointerCapture(pid);tin.mg=true;mgButton.classList.add("on");});const up=e=>{if(e.pointerId!==pid)return;pid=null;tin.mg=false;mgButton.classList.remove("on");};["pointerup","pointercancel","lostpointercapture"].forEach(n=>mgButton.addEventListener(n,up));}
   const mineButton=$("tbMine");if(mineButton)mineButton.addEventListener("click",()=>{if(mobileTouch&&MODE==="tank"&&state==="play"){audio();useAcc("mine",T,1);}});
