@@ -1234,7 +1234,7 @@ html.ctl-edit body.tank #tctl [data-drag]::after{content:"ARRASTE";position:abso
 @media(pointer:fine){body.tank #tctl{display:none!important}}
 
 /* Touchscreen isolado: desktop não recebe estas regras. */
-html.mobile-controls body.tank #tctl{display:block;pointer-events:none;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+html.mobile-controls body.tank #tctl{display:block!important;pointer-events:none;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
 html.mobile-controls body.tank #cv,html.mobile-controls body.tank #stage,html.mobile-controls body.tank #tctl,html.mobile-controls body.tank #tctl button{touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
 html.mobile-controls body.tank #tkeys,html.mobile-controls body.tank #avMultiLink{display:none!important}
 html.mobile-controls body.tank #moveStick{display:block;position:absolute;left:max(22px,env(safe-area-inset-left));bottom:max(22px,env(safe-area-inset-bottom));width:clamp(126px,25vmin,170px);aspect-ratio:1;border-radius:50%;background:rgba(18,30,14,.62);border:2px solid #d9edc1a8;box-shadow:0 5px 20px #0009;pointer-events:auto;touch-action:none;opacity:var(--ctl-opacity)}
