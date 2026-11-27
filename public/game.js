@@ -5641,7 +5641,7 @@
             ? "#c8d0c0"
             : "#ff8a5a"
           : "rgba(230,238,210,.55)";
-      const label = `${k === "missile" ? "MÍSSIL" : k === "mine" ? "MINA" : "FUMAÇA"} ${a.own ? a.ammo : "-"}`;
+      const label = `${k === "missile" ? "LEVE" : k === "heavy" ? "PESADO" : k === "mine" ? "MINA" : "FUMAÇA"} ${a.own ? a.ammo : "-"}`;
       ctx.fillText(label, ax0, 116);
       if (on && a.own && k !== "smoke") ctx.fillRect(ax0, 120, ctx.measureText(label).width, 2);
       ax0 += ctx.measureText(label).width + 14;
@@ -5763,6 +5763,7 @@
         dy /= m;
       }
       tin[key] = { x: dx, y: dy };
+      if (key === "joy2") tin.cannon = true;
       knob.style.transform = `translate(${dx * R * 0.6}px,${dy * R * 0.6}px)`;
     };
     el.addEventListener("pointerdown", (e) => {
@@ -5780,6 +5781,7 @@
       if (e.pointerId !== id) return;
       id = null;
       tin[key] = null;
+      if (key === "joy2") tin.cannon = false;
       knob.style.transform = "";
     };
     el.addEventListener("pointerup", end);
