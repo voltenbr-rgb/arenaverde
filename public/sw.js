@@ -1,5 +1,5 @@
 // Arena Verde — service worker: funciona offline e pega versões novas automaticamente.
-const V = "arenaverde-v13";
+const V = "arenaverde-v14";
 const SHELL = [
   "/",
   "/style.css",
@@ -16,6 +16,7 @@ const SHELL = [
     `/assets/sprites/${k}.png`,
   ]),
   ...["normal", "runner", "armored", "spitter", "boss"].map((k) => `/assets/sprites/z_${k}.png`),
+  ...Array.from({ length: 11 }, (_, i) => `/audio/radio/radio_${String(i + 1).padStart(2, "0")}.mp3`),
 ];
 
 self.addEventListener("install", (e) => {
