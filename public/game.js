@@ -5284,6 +5284,10 @@
       case "barrel":
         groundShadow(lay, 5, 5);
         cyl(lay, 3.6, 9, fl ? "#fff" : "#7a1c14", "#c0392b");
+        // Aros metálicos, costura e brilho lateral do tambor.
+        lay(2.2); ctx.fillStyle = "#4b2118"; ctx.fillRect(-3.55, -3.7, 7.1, .9);
+        lay(6.8); ctx.fillStyle = "#3c1a13"; ctx.fillRect(-3.55, -3.7, 7.1, .85);
+        ctx.fillStyle = "rgba(255,190,130,.5)"; ctx.fillRect(-2.5, -3.8, 1.1, .55);
         lay(4);
         ctx.fillStyle = "#f2c230";
         ctx.beginPath();
@@ -5318,12 +5322,19 @@
         }
         return;
       case "fence":
-        for (const px of [-11, 0, 11]) box(lay, 1.6, 1.6, 9, "#3d2712", "#6b4a2a", px, 0);
+        for (const px of [-11, 0, 11]) {
+          box(lay, 1.6, 1.6, 9, "#3d2712", "#6b4a2a", px, 0);
+          lay(8.8); ctx.fillStyle = "rgba(220,180,112,.55)"; ctx.fillRect(px - .55, - .55, .45, 1.1);
+        }
         for (const h of [3, 6]) {
           box(lay, 24, 0.7, 0.8, "#6b6e72", "#b0b4b8", 0, 0, h);
           lay(h + 0.8);
           ctx.fillStyle = "#d0d4d8";
           for (let k = -10; k < 11; k += 3) ctx.fillRect(k, -1, 0.6, 2);
+          ctx.strokeStyle = "rgba(25,31,34,.85)"; ctx.lineWidth = .65;
+          ctx.beginPath(); ctx.moveTo(-11, -.8); ctx.lineTo(11, -.8); ctx.stroke();
+          ctx.strokeStyle = "rgba(226,232,224,.72)"; ctx.lineWidth = .35;
+          ctx.beginPath(); ctx.moveTo(-11, -.15); ctx.lineTo(11, -.15); ctx.stroke();
         }
         return;
       case "rock": {
@@ -5647,15 +5658,20 @@
           if (!im) return;
           const h = SPRITE_H["z_" + z.type] * K;
           let rot = 0,
-            dy = 0;
+            dy = 0,
+            gait = 0;
           if (z.bite) rot = -(0.06 + 0.06 * Math.sin(z.t * 18));
           else if (z.firing > 0) rot = 0.03 * Math.sin(z.t * 40);
           else {
-            const ph = Math.sin(z.t * (z.type === "runner" ? 14 : z.d.big ? 5 : 7));
-            rot = ph * 0.05;
-            dy = -Math.abs(ph) * 0.8 * K;
+            gait = Math.sin(z.t * (z.type === "runner" ? 14 : z.d.big ? 5 : 7));
+            rot = gait * 0.05;
+            dy = -Math.abs(gait) * 0.8 * K;
           }
-          drawImg(im, sx, sy + dy, h, { fl: z.fl, rot: flip ? -rot : rot, sx: flip ? -1 : 1, pixel: true });
+          // Respiração/passo arcade discreto: só escala do sprite, hitbox e velocidade ficam intactas.
+          const squash = z.bite ? .965 : 1 + Math.abs(gait) * .022;
+          drawImg(im, sx, sy + dy, h, { fl: z.fl, rot: flip ? -rot : rot,
+            sx: (flip ? -1 : 1) * (z.bite ? 1.035 : 1 + Math.abs(gait) * .012),
+            sy: squash, pixel: true });
           if (!z.d.big) bar(sx, sy - h - 3 * K, z.hp, z.max);
         },
         0.5,
