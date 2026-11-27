@@ -2,7 +2,7 @@
 {
   const $ = (id) => document.getElementById(id);
   // CONFIGURAÇÃO DE MANUTENÇÃO: altere para false ao liberar o jogo ao público.
-  const MODO_MANUTENCAO = true;
+  const MODO_MANUTENCAO = false;
   const DEV_QUERY = new URLSearchParams(location.search);
   let DEV_BYPASS = DEV_QUERY.get("dev") === "1" || DEV_QUERY.get("teste") === "1";
   try {
