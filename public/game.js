@@ -5834,7 +5834,7 @@
     if ($("tbSpec").textContent !== sl) $("tbSpec").textContent = sl;
     if ($("tbSmoke").textContent !== fl) $("tbSmoke").textContent = fl;
     const mgSmall = $("tbMG")?.querySelector("small");
-    if (mgSmall) mgSmall.textContent = T.mgRest > 0 ? `RECARGA ${T.mgRest.toFixed(0)}s` : `${T.mgTimeLeft.toFixed(0)}s / ${20 + 5 * (lv.mg || 0)}s`;
+    if (mgSmall) mgSmall.textContent = T.mgRest > 0 ? `RECARGA ${T.mgRest.toFixed(0)}s` : `${tin.mg || pad.mg || tkeys.has("shift") ? "DISPARO" : "PRONTO"} ${T.mgTimeLeft.toFixed(0)}s`;
     const boss = tz.find((z) => z.d.big && !z.dead);
     if (boss) $("bossfill").style.width = Math.max(0, (boss.hp / boss.max) * 100) + "%";
     else if (!$("bossbar").hidden) $("bossbar").hidden = true;
