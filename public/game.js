@@ -4121,7 +4121,7 @@
     document.body.classList.remove("tank");
     tkeys.clear();
     tin.cannon = tin.mg = tin.spec = tin.smoke = tin.moveUp = tin.moveDown = tin.moveLeft = tin.moveRight = tin.aimLeft = tin.aimRight = false;
-    tin.joyX = tin.joyY = 0; tin.mouse = null;
+    tin.joyX = tin.joyY = 0; tin.mouse = null; tSoldiers = []; soldierCharges = 0;
     try {
       if (document.fullscreenElement) document.exitFullscreen();
     } catch (e) {}
@@ -4907,7 +4907,7 @@
     let fwd = (tkeys.has("w") ? 1 : 0) - (tkeys.has("s") ? 1 : 0),
       rot = (tkeys.has("d") ? 1 : 0) - (tkeys.has("a") ? 1 : 0);
     const sens = mobileCfg.sensitivity / 100;
-    if (mobileTouch && (Math.abs(tin.joyX) > 0.04 || Math.abs(tin.joyY) > 0.04)) {
+    if (mobileTouch && Math.hypot(tin.joyX, tin.joyY) > 0.08) {
       fwd = -tin.joyY;
       rot = tin.joyX;
     } else if (tin.moveUp || tin.moveDown || tin.moveLeft || tin.moveRight) {
@@ -5914,7 +5914,7 @@
     if ($("tbSpec").textContent !== sl) $("tbSpec").textContent = sl;
     if ($("tbSmoke").textContent !== fl) $("tbSmoke").textContent = fl;
     const soldierButton = $("tbSoldiers");
-    if (soldierButton) soldierButton.innerHTML = `🪖<small>SOLDADOS ${soldierCharges} · ${tSoldiers.length}/2</small>`;
+    if (soldierButton) { soldierButton.innerHTML = `🪖<small>SOLDADOS ${soldierCharges} · ${tSoldiers.length}/2</small>`; soldierButton.classList.toggle("soldier-ready", soldierCharges > 0); }
     const mgSmall = $("tbMG")?.querySelector("small");
     if (mgSmall) mgSmall.textContent = T.mgRest > 0 ? `RECARGA ${T.mgRest.toFixed(0)}s` : `${tin.mg || pad.mg || tkeys.has("shift") ? "DISPARO" : "PRONTO"} ${T.mgTimeLeft.toFixed(0)}s`;
     const boss = tz.find((z) => z.d.big && !z.dead);
@@ -6074,6 +6074,7 @@
     ["pointerup","pointercancel","lostpointercapture"].forEach(n=>mgButton.addEventListener(n,up));
   }
   const mineButton=$("tbMine");if(mineButton)mineButton.addEventListener("click",()=>{if(mobileTouch&&MODE==="tank"&&state==="play"){audio();useAcc("mine",T,1);}});
+  const soldiersButton=$("tbSoldiers");if(soldiersButton)soldiersButton.addEventListener("click",()=>{if(mobileTouch&&MODE==="tank"&&state==="play"){audio();deploySoldiers();soldiersButton.classList.toggle("soldier-ready",soldierCharges>0);}});
   $("tpause").addEventListener("click", () => { audio(); togglePause(); });
   $("tOptions").addEventListener("click", () => { audio(); $("tOptionsPanel").hidden = !$("tOptionsPanel").hidden; });
   $("ctlClose").addEventListener("click", () => { $("tOptionsPanel").hidden = true; });
