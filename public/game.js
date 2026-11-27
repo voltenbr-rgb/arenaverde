@@ -4032,7 +4032,6 @@
     document.body.classList.remove("tank");
     tkeys.clear();
     tin.cannon = tin.mg = tin.spec = tin.smoke = tin.moveUp = tin.moveDown = tin.moveLeft = tin.moveRight = tin.aimLeft = tin.aimRight = false;
-    tin.joy = tin.joy2 = null;
     try {
       if (document.fullscreenElement) document.exitFullscreen();
     } catch (e) {}
@@ -5759,45 +5758,6 @@
     },
     { passive: false },
   );
-  // analógicos da tela (esquerdo = andar, direito = torreta)
-  function stickCtl(el, key) {
-    const knob = el.querySelector("i");
-    let id = null;
-    const set = (e) => {
-      const r = el.getBoundingClientRect(),
-        R = r.width / 2;
-      let dx = (e.clientX - (r.left + R)) / R,
-        dy = (e.clientY - (r.top + R)) / R;
-      const m = Math.hypot(dx, dy);
-      if (m > 1) {
-        dx /= m;
-        dy /= m;
-      }
-      tin[key] = { x: dx, y: dy };
-      if (key === "joy2") tin.cannon = true;
-      knob.style.transform = `translate(${dx * R * 0.6}px,${dy * R * 0.6}px)`;
-    };
-    el.addEventListener("pointerdown", (e) => {
-      audio();
-      id = e.pointerId;
-      try {
-        el.setPointerCapture(id);
-      } catch (err) {}
-      tin.touch = true;
-      tin.mouse = null;
-      set(e);
-    });
-    el.addEventListener("pointermove", (e) => e.pointerId === id && set(e));
-    const end = (e) => {
-      if (e.pointerId !== id) return;
-      id = null;
-      tin[key] = null;
-      if (key === "joy2") tin.cannon = false;
-      knob.style.transform = "";
-    };
-    el.addEventListener("pointerup", end);
-    el.addEventListener("pointercancel", end);
-  }
   applyMobileCfg();
   const pressControl = (id, key) => {
     const b=$(id); if(!b) return;
