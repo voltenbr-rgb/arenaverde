@@ -1176,7 +1176,7 @@ body.tank #rotate {
 :root{--ctl-opacity:.78;--ctl-size:1}
 body.tank #tctl{pointer-events:none}
 body.tank #tctl .stick,body.tank #tctl .tbtns,body.tank #tctl .tbtns2,body.tank #tctl #tOptions,body.tank #tctl #tOptionsPanel{pointer-events:auto}
-body.tank #tctl .stick{width:clamp(104px,26vmin,150px);opacity:var(--ctl-opacity);background:rgba(18,30,14,.32);border:2px solid #e1f5cd80;box-shadow:0 4px 18px #0008}
+body.tank #tctl .stick{width:calc(clamp(104px,26vmin,150px) * var(--ctl-size));opacity:var(--ctl-opacity);background:rgba(18,30,14,.32);border:2px solid #e1f5cd80;box-shadow:0 4px 18px #0008}
 body.tank #tctl .stick i{width:38%;height:38%;margin:-19% 0 0 -19%;background:#bedca080;border:2px solid #e6eed2aa}
 body.tank #tctl .stick span{position:absolute;left:0;right:0;bottom:12%;text-align:center;color:#fff9;font:700 8px Arial;text-shadow:0 1px 3px #000;pointer-events:none}
 body.tank #joy{left:max(14px,env(safe-area-inset-left));bottom:max(14px,env(safe-area-inset-bottom))}
@@ -1203,5 +1203,5 @@ html[data-ctlstyle="neon"] body.tank #tctl .stick{border-color:#50ffd0;backgroun
 html[data-ctlstyle="neon"] body.tank #tctl .tbtns button,html[data-ctlstyle="neon"] body.tank #tctl .tbtns2 button{background:#07564dcc;border-color:#62ffce}
 html[data-ctlstyle="discreto"] body.tank #tctl .stick{background:#0003;border-color:#ffffff44}
 html[data-ctlstyle="discreto"] body.tank #tctl .tbtns button,html[data-ctlstyle="discreto"] body.tank #tctl .tbtns2 button{background:#0008;border-color:#ffffff55}
-@media(orientation:portrait) and (pointer:coarse){body.tank #tctl .stick{width:clamp(96px,25vmin,130px)}body.tank #tctl .tbtns{right:calc(max(8px,env(safe-area-inset-right)) + clamp(96px,25vmin,130px) + 6px)}body.tank #tctl .tbtns2{bottom:calc(max(8px,env(safe-area-inset-bottom)) + clamp(96px,25vmin,130px) + 8px)}}
+@media(orientation:portrait) and (pointer:coarse){body.tank #tctl .stick{width:calc(clamp(96px,25vmin,130px) * var(--ctl-size))}body.tank #tctl .tbtns{right:calc(max(8px,env(safe-area-inset-right)) + clamp(96px,25vmin,130px) + 6px)}body.tank #tctl .tbtns2{bottom:calc(max(8px,env(safe-area-inset-bottom)) + clamp(96px,25vmin,130px) + 8px)}}
 @media(pointer:fine){body.tank #tctl{display:none!important}}
