@@ -3907,7 +3907,7 @@
       phase: 0,
       fl: 0,
     };
-    T2 = {x:2*CELL,y:roadY(2*CELL)+52,ang:0,tur:0,vel:0,hp:st.max,cd:.8,mgCd:0,phase:0,fl:0};
+    T2 = null;
     tz = [];
     tp = [];
     zp = [];
@@ -4597,7 +4597,7 @@
       const allPads = [...(navigator.getGamepads ? navigator.getGamepads() : [])];
       gp = allPads.find((g) => g && g.connected && g.axes.length >= 2);
       const gp2 = allPads.filter((g) => g && g.connected && g.axes.length >= 2).find((g) => g.index !== (gp && gp.index));
-      if (gp2) { const dz2=v=>Math.abs(v)<.18?0:v, b2=i=>!!(gp2.buttons[i]&&(gp2.buttons[i].pressed||gp2.buttons[i].value>.4)); pad2.lx=dz2(gp2.axes[0]||0);pad2.ly=dz2(gp2.axes[1]||0);pad2.rx=dz2(gp2.axes[2]||0);pad2.ry=dz2((gp2.mapping==="standard"?gp2.axes[3]:gp2.axes.length>5?gp2.axes[5]:gp2.axes[3])||0);pad2.cannon=b2(7);pad2.mg=b2(5);pad2.id=gp2.id; } else {pad2.lx=pad2.ly=pad2.rx=pad2.ry=0;pad2.cannon=pad2.mg=false;pad2.id="";}
+      if (gp2) { const dz2=v=>Math.abs(v)<.18?0:v, b2=i=>!!(gp2.buttons[i]&&(gp2.buttons[i].pressed||gp2.buttons[i].value>.4)); pad2.lx=dz2(gp2.axes[0]||0);pad2.ly=dz2(gp2.axes[1]||0);pad2.rx=dz2(gp2.axes[2]||0);pad2.ry=dz2((gp2.mapping==="standard"?gp2.axes[3]:gp2.axes.length>5?gp2.axes[5]:gp2.axes[3])||0);pad2.cannon=b2(7);pad2.mg=b2(5);pad2.id=gp2.id; if(!T2 && MODE==="tank" && state==="play" && T) { const st2=tStats(); T2={x:T.x,y:T.y+52,ang:0,tur:0,vel:0,hp:st2.max,cd:.8,mgCd:0,phase:0,fl:0}; banner("JOGADOR 2 ENTROU NA MISSÃO",2); } } else {pad2.lx=pad2.ly=pad2.rx=pad2.ry=0;pad2.cannon=pad2.mg=false;pad2.id="";}
     } catch (e) {}
     if (!gp) {
       pad.lx = pad.ly = pad.rx = pad.ry = 0;
