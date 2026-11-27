@@ -3335,6 +3335,16 @@
   let tcfg2 = Object.assign({ camo: "verde", cannon: "padrao", chassis: "medio" }, store.get("tank2") || {});
   const tkeys = new Set();
   const tin = { joy: null, joy2: null, cannon: false, mg: false, touch: false, mouse: null };
+  const mobileCfg = Object.assign({ opacity: 78, sensitivity: 100, size: 100, style: "verde" }, store.get("mobileControls") || {});
+  function applyMobileCfg() {
+    const root = document.documentElement;
+    root.style.setProperty("--ctl-opacity", String(mobileCfg.opacity / 100));
+    root.style.setProperty("--ctl-size", String(mobileCfg.size / 100));
+    root.dataset.ctlstyle = mobileCfg.style;
+    for (const [id, value] of [["ctlOpacity",mobileCfg.opacity],["ctlSensitivity",mobileCfg.sensitivity],["ctlSize",mobileCfg.size],["ctlStyle",mobileCfg.style]]) { const el=$(id); if(el) el.value=value; }
+  }
+  function saveMobileCfg() { store.set("mobileControls", mobileCfg); applyMobileCfg(); }
+
   // manchas de camuflagem (posições fixas, em fração do casco)
   const BLOBS = [];
   {
@@ -4748,10 +4758,9 @@
       rot = (tkeys.has("d") ? 1 : 0) - (tkeys.has("a") ? 1 : 0);
     const stick = tin.joy || (pad.lx || pad.ly ? { x: pad.lx, y: pad.ly } : null);
     if (stick) {
-      const sy = -stick.y,
-        sx = stick.x;
-      fwd = Math.abs(sy) > 0.2 ? Math.max(-1, Math.min(1, sy * 1.15)) : 0;
-      rot = Math.abs(sx) > 0.2 ? Math.max(-1, Math.min(1, sx * 1.15)) : 0;
+      const sy = -stick.y, sx = stick.x, sens = mobileCfg.sensitivity / 100;
+      fwd = Math.abs(sy) > 0.12 ? Math.max(-1, Math.min(1, sy * 1.15 * sens)) : 0;
+      rot = Math.abs(sx) > 0.12 ? Math.max(-1, Math.min(1, sx * 1.15 * sens)) : 0;
     }
     T.ang += rot * st.turn * dt;
     const target = fwd * st.speed * (fwd < 0 ? 0.6 : 1);
@@ -4793,7 +4802,7 @@
       aim =
         tin.joy2 || (Math.hypot(pad.rx, pad.ry) > 0.3 ? { x: pad.rx, y: pad.ry } : ax || ay ? { x: ax, y: ay } : null);
     if (aim && Math.hypot(aim.x, aim.y) > 0.25) {
-      T.tur = turnTo(T.tur, screenToGroundDir(aim.x, aim.y), 4.5 * dt);
+      T.tur = turnTo(T.tur, screenToGroundDir(aim.x, aim.y), 4.5 * (mobileCfg.sensitivity / 100) * dt);
       if (tin.joy2 || pad.rx || pad.ry) aimDist = 90 + 200 * Math.min(1, Math.hypot(aim.x, aim.y)); // empurrar mais = mira mais longe
     } else if (tin.mouse) T.tur = turnTo(T.tur, Math.atan2(tin.mouse.y - T.y, tin.mouse.x - T.x), 4 * dt);
     // --- armas
@@ -5785,6 +5794,7 @@
     el.addEventListener("pointerup", end);
     el.addEventListener("pointercancel", end);
   }
+  applyMobileCfg();
   stickCtl($("joy"), "joy");
   stickCtl($("joy2"), "joy2");
   $("tbSwap").addEventListener("click", () => {
@@ -5816,10 +5826,15 @@
     b.addEventListener("pointerup", up);
     b.addEventListener("pointercancel", up);
   }
-  $("tpause").addEventListener("click", () => {
-    audio();
-    togglePause();
-  });
+  $("tpause").addEventListener("click", () => { audio(); togglePause(); });
+  $("tOptions").addEventListener("click", () => { audio(); $("tOptionsPanel").hidden = !$("tOptionsPanel").hidden; });
+  $("ctlClose").addEventListener("click", () => { $("tOptionsPanel").hidden = true; });
+  $("ctlOpacity").addEventListener("input", e => { mobileCfg.opacity = +e.target.value; saveMobileCfg(); });
+  $("ctlSensitivity").addEventListener("input", e => { mobileCfg.sensitivity = +e.target.value; saveMobileCfg(); });
+  $("ctlSize").addEventListener("input", e => { mobileCfg.size = +e.target.value; saveMobileCfg(); });
+  $("ctlStyle").addEventListener("change", e => { mobileCfg.style = e.target.value; saveMobileCfg(); });
+  $("ctlReset").addEventListener("click", () => { Object.assign(mobileCfg,{opacity:78,sensitivity:100,size:100,style:"verde"}); saveMobileCfg(); });
+
 
   /* ---------- layout + loop ---------- */
   function fit() {
