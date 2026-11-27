@@ -4526,7 +4526,7 @@
         R = CHASSIS[cfg.chassis].W * 0.37,
         target = player === 2 ? null : aimPoint(),
         baseAng = target ? Math.atan2(target.y - tank.y, target.x - tank.x) : tank.tur,
-        offsets = [-0.24, -0.12, 0, 0.12, 0.24],
+        offsets = [-0.10, 0, 0.10],
         range = CELL * 5;
       for (const spread of offsets) {
         const ang = baseAng + spread,
@@ -4535,9 +4535,9 @@
           tx = tank.x + Math.cos(ang) * range,
           ty = tank.y + Math.sin(ang) * range,
           d = Math.hypot(tx - x0, ty - y0) || 1;
-        tp.push({ k:"msl",x0,y0,x:x0,y:y0,tx,ty,h:16,t:0,T:0.42+d/520,vx:0,vy:0,dmg:26,splash:18 });
+        tp.push({ k:"msl",x0,y0,x:x0,y:y0,tx,ty,h:16,t:0,T:0.42+d/520,vx:0,vy:0,dmg:18,splash:13 });
         const [a2,b2]=P(x0,y0,17);
-        for(let i=0;i<3;i++)G(GL.sl,a2,b2,{add:false,a:.5,smoke:1,vx:rnd(-14,14),vy:rnd(-4,10),r0:1.5,r1:rnd(4,8),life:rnd(.55,1),drag:1.5});
+        for(let i=0;i<2;i++)G(GL.sl,a2,b2,{add:false,a:.38,smoke:1,vx:rnd(-9,9),vy:rnd(-3,7),r0:1.2,r1:rnd(3,5),life:rnd(.45,.75),drag:1.5});
         G(GL.o,a2,b2,{r0:3,r1:6,life:.1});
       }
       sfx("launch"); rumble(.3,80);
@@ -5842,29 +5842,22 @@
   if(aimFire){let pid=null;aimFire.addEventListener("pointerdown",e=>{if(!mobileTouch||MODE!=="tank"||state!=="play"||pid!==null)return;e.preventDefault();audio();pid=e.pointerId;aimFire.setPointerCapture(pid);tin.cannon=true;aimFire.classList.add("on");});
     const up=e=>{if(e.pointerId!==pid)return;pid=null;tin.cannon=false;aimFire.classList.remove("on");};["pointerup","pointercancel","lostpointercapture"].forEach(n=>aimFire.addEventListener(n,up));
   }
-  // Área de toque horizontal: arrastar para os lados gira a torreta apenas enquanto o dedo está pressionado.
-  const turretPad=$("aimPad");
-  if(turretPad){
-    let pointer=null,lastX=0;
-    turretPad.addEventListener("pointerdown",e=>{
-      if(!mobileTouch||MODE!=="tank"||state!=="play"||pointer!==null)return;
-      e.preventDefault();audio();pointer=e.pointerId;lastX=e.clientX;
-      try{turretPad.setPointerCapture(pointer)}catch(err){}
-      turretPad.classList.add("active");
-    });
-    turretPad.addEventListener("pointermove",e=>{
-      if(e.pointerId!==pointer||!T)return;
-      e.preventDefault();
-      const dx=e.clientX-lastX;lastX=e.clientX;
-      const sens=(mobileCfg.sensitivity||100)/100;
-      T.tur+=dx*0.012*sens;
+  // Dois lados de toque: manter o lado esquerdo/direito pressionado gira a torreta; soltar para imediatamente.
+  [["aimPadLeft","aimLeft"],["aimPadRight","aimRight"]].forEach(([id,key])=>{
+    const zone=$(id);if(!zone)return;const active=new Set();
+    zone.addEventListener("pointerdown",e=>{
+      if(!mobileTouch||MODE!=="tank"||state!=="play")return;
+      e.preventDefault();audio();active.add(e.pointerId);
+      try{zone.setPointerCapture(e.pointerId)}catch(err){}
+      tin[key]=true;zone.classList.add("active");
     });
     const release=e=>{
-      if(e.pointerId!==pointer)return;
-      pointer=null;turretPad.classList.remove("active");
+      if(!active.has(e.pointerId))return;
+      active.delete(e.pointerId);tin[key]=active.size>0;
+      zone.classList.toggle("active",tin[key]);
     };
-    ["pointerup","pointercancel","lostpointercapture"].forEach(n=>turretPad.addEventListener(n,release));
-  }
+    ["pointerup","pointercancel","lostpointercapture"].forEach(n=>zone.addEventListener(n,release));
+  });
   const centerTurret=$("tbTurretCenter");
   if(centerTurret)centerTurret.addEventListener("click",()=>{
     if(!mobileTouch||MODE!=="tank"||state!=="play"||!T)return;
