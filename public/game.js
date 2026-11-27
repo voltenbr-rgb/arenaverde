@@ -2699,8 +2699,9 @@
   addEventListener("keydown", (e) => {
     if (e.target.tagName === "INPUT") return;
     if (MODE === "tank") {
-      if (state === "play" && tKey(e, true)) return;
       const k = e.key.toLowerCase();
+      if (state === "tselect" && tankSetupPlayer===1) { const keys=Object.keys(CAMO); if(k==="a"||k==="arrowleft"||k==="d"||k==="arrowright"){e.preventDefault();const i=keys.indexOf(tcfg.camo),n=(i+(k==="a"||k==="arrowleft"?-1:1)+keys.length)%keys.length;tcfg.camo=keys[n];showTankSelect(1);return;} if(k==="enter"){e.preventDefault();showTankSelect(2);return;} }
+      if (state === "play" && tKey(e, true)) return;
       if (k === "p" || k === "escape") togglePause();
       return;
     }
@@ -2955,9 +2956,11 @@
       camp = { m: 0, money: 100, lv: {}, score: 0, acc: accDefault() };
       saveCamp();
       tStart();
-    } else if (k === "tsetup") showTankSetup();
-    else if (k === "tgo") {
-      store.set("tank", tcfg);
+    } else if (k === "tsetup") showTankPlayers();
+    else if (k === "tplayers") { tankPlayers=+(a.dataset.n||1); if(tankPlayers===2) showTankSelect(1); else showTankSetup();
+    } else if (k === "tselect") { const p=+(a.dataset.p||tankSetupPlayer), v=a.dataset.v; if(v){ if(p===1) tcfg.camo=v; else tcfg2.camo=v; showTankSelect(p); return; } if(p===1) showTankSelect(2); else { store.set("tank2",tcfg2); showTankSetup(); }
+    } else if (k === "tgo") {
+      store.set("tank", tcfg); store.set("tank2",tcfg2);
       tStart();
     } else if (k === "tcfg") {
       tcfg[a.dataset.g] = a.dataset.v;
@@ -3294,6 +3297,8 @@
   const REPAIR_COST = 60;
   let tcfg = Object.assign({ camo: "bravo", cannon: "padrao", chassis: "medio" }, store.get("tank") || {});
   let tankBest = +(store.get("tankBest") || 0);
+  let tankPlayers = 1, tankSetupPlayer = 1;
+  let tcfg2 = Object.assign({ camo: "verde", cannon: "padrao", chassis: "medio" }, store.get("tank2") || {});
   const tkeys = new Set();
   const tin = { joy: null, joy2: null, cannon: false, mg: false, touch: false, mouse: null };
   // manchas de camuflagem (posições fixas, em fração do casco)
@@ -3907,7 +3912,7 @@
       phase: 0,
       fl: 0,
     };
-    T2 = null;
+    T2 = tankPlayers === 2 ? { x: T.x, y: T.y + 58, ang: 0, tur: 0, vel: 0, hp: Math.round(CHASSIS[tcfg2.chassis].hp * (1 + 0.2 * (lv.armor || 0))), cd: 0.8, mgCd: 0, phase: 0, fl: 0 } : null;
     tz = [];
     tp = [];
     zp = [];
@@ -4004,6 +4009,14 @@
       )
       .join("")}</div></div>`;
   }
+  function showTankPlayers() {
+    state="tplayers";
+    showOv(`<h2 class="title">MODO TANK</h2><p class="sub">Quantos jogadores vão entrar na missão?</p><button class="big" data-a="tplayers" data-n="1">1 JOGADOR</button><button class="big" data-a="tplayers" data-n="2">2 JOGADORES · COOPERATIVO LOCAL</button><button class="alt" data-a="menu">VOLTAR</button>`);
+  }
+  function showTankSelect(player) {
+    tankSetupPlayer=player; state="tselect"; const cfg=player===1?tcfg:tcfg2;
+    showOv(`<h2 class="title">JOGADOR ${player}</h2><p class="sub">${player===1?"PC · ENTER PARA CONFIRMAR":"CONTROLE · X PARA CONFIRMAR"}</p><p class="tname">ESCOLHA A COR DO SEU TANQUE</p><div class="topts">${Object.keys(CAMO).map(k=>`<button class="opt${cfg.camo===k?" on":""}" data-a="tselect" data-p="${player}" data-v="${k}"><i class="sw" style="background:${CAMO[k].base}"></i>${CAMO[k].n}</button>`).join("")}</div><p class="hint">${player===1?"Use A/D para trocar a cor e ENTER para confirmar.":"Use o direcional ←/→ e X para confirmar."}</p><button class="big" data-a="tselect" data-p="${player}">CONFIRMAR JOGADOR ${player}</button><button class="alt" data-a="menu">CANCELAR</button>`);
+  }
   function showTankSetup() {
     state = "tsetup";
     const ch = CHASSIS[tcfg.chassis],
@@ -4016,7 +4029,7 @@
  ${optRow("CANHÃO", "cannon", CANNON, (o) => o.desc)}
  ${optRow("CHASSI", "chassis", CHASSIS, (o) => o.desc)}
  <p class="hint">PC: W/S frente e ré · A/D giram o tanque · setas ou mouse = torreta · ESPAÇO ou clique esq. = canhão · SHIFT ou clique dir. = metralhadora · E = acessório · Q = fumaça · TAB/roda = troca<br>Controle PS4: analógico esq. frente/ré e giro · analógico dir. torreta · R2 canhão · R1 metralhadora · L1 acessório · L2 fumaça · ←/→ troca · OPTIONS pausa<br>Celular: os mesmos comandos nos analógicos e botões da tela</p>
- <button class="big" data-a="tgo">${camp.m > 0 ? "CONTINUAR CAMPANHA ▶" : "INICIAR CAMPANHA ▶"}</button>${camp.m > 0 ? '<button class="alt" data-a="treset">RECOMEÇAR</button>' : ""}<button class="alt" data-a="menu">VOLTAR</button>`);
+ <p class="hint">${tankPlayers===2?`JOGADOR 1: ${CAMO[tcfg.camo].n} · JOGADOR 2: ${CAMO[tcfg2.camo].n}`:""}</p><button class="big" data-a="tgo">${camp.m > 0 ? "CONTINUAR CAMPANHA ▶" : "INICIAR CAMPANHA ▶"}</button>${camp.m > 0 ? '<button class="alt" data-a="treset">RECOMEÇAR</button>' : ""}<button class="alt" data-a="menu">VOLTAR</button>`);
     drawPreview(0);
   }
   function drawPreview(time) {
@@ -4596,8 +4609,9 @@
     try {
       const allPads = [...(navigator.getGamepads ? navigator.getGamepads() : [])];
       gp = allPads.find((g) => g && g.connected && g.axes.length >= 2);
-      const gp2 = allPads.filter((g) => g && g.connected && g.axes.length >= 2).find((g) => g.index !== (gp && gp.index));
-      if (gp2) { const dz2=v=>Math.abs(v)<.18?0:v, b2=i=>!!(gp2.buttons[i]&&(gp2.buttons[i].pressed||gp2.buttons[i].value>.4)); pad2.lx=dz2(gp2.axes[0]||0);pad2.ly=dz2(gp2.axes[1]||0);pad2.rx=dz2(gp2.axes[2]||0);pad2.ry=dz2((gp2.mapping==="standard"?gp2.axes[3]:gp2.axes.length>5?gp2.axes[5]:gp2.axes[3])||0);pad2.cannon=b2(7);pad2.mg=b2(5);pad2.id=gp2.id; if(!T2 && MODE==="tank" && state==="play" && T) { const st2=tStats(); T2={x:T.x,y:T.y+52,ang:0,tur:0,vel:0,hp:st2.max,cd:.8,mgCd:0,phase:0,fl:0}; banner("JOGADOR 2 ENTROU NA MISSÃO",2); } } else {pad2.lx=pad2.ly=pad2.rx=pad2.ry=0;pad2.cannon=pad2.mg=false;pad2.id="";}
+      const gp2 = tankPlayers === 2 ? gp : allPads.filter((g) => g && g.connected && g.axes.length >= 2).find((g) => g.index !== (gp && gp.index));
+      if (tankPlayers === 2) gp = null;
+      if (gp2) { const dz2=v=>Math.abs(v)<.18?0:v, b2=i=>!!(gp2.buttons[i]&&(gp2.buttons[i].pressed||gp2.buttons[i].value>.4)); pad2.lx=dz2(gp2.axes[0]||0);pad2.ly=dz2(gp2.axes[1]||0);pad2.rx=dz2(gp2.axes[2]||0);pad2.ry=dz2((gp2.mapping==="standard"?gp2.axes[3]:gp2.axes.length>5?gp2.axes[5]:gp2.axes[3])||0);pad2.cannon=b2(7);pad2.mg=b2(5);pad2.id=gp2.id; if(state==="tselect" && tankSetupPlayer===2){const keys=Object.keys(CAMO),i=keys.indexOf(tcfg2.camo);if(b2(14))tcfg2.camo=keys[(i+keys.length-1)%keys.length];if(b2(15))tcfg2.camo=keys[(i+1)%keys.length];if(b2(0)&&!pad2.confirm){pad2.confirm=true;store.set("tank2",tcfg2);showTankSetup();}} else pad2.confirm=false; if(!T2 && MODE==="tank" && state==="play" && T) { const st2=tStats(); T2={x:T.x,y:T.y+52,ang:0,tur:0,vel:0,hp:st2.max,cd:.8,mgCd:0,phase:0,fl:0}; banner("JOGADOR 2 ENTROU NA MISSÃO",2); } } else {pad2.lx=pad2.ly=pad2.rx=pad2.ry=0;pad2.cannon=pad2.mg=false;pad2.id="";}
     } catch (e) {}
     if (!gp) {
       pad.lx = pad.ly = pad.rx = pad.ry = 0;
@@ -4647,15 +4661,16 @@
     const st = tStats();
     // COOPERATIVO LOCAL: o segundo controle pilota um segundo tanque independente.
     if (T2 && state === "play") {
-      const f2=-pad2.ly, r2=pad2.lx; T2.ang+=(Math.abs(r2)>.18?r2:0)*st.turn*dt;
-      const v2=(Math.abs(f2)>.18?f2:0)*st.speed*(f2<0?.6:1); T2.vel+=(v2-T2.vel)*Math.min(1,dt*5);
+      const st2={max:Math.round(CHASSIS[tcfg2.chassis].hp*(1+0.2*(lv.armor||0))),speed:CHASSIS[tcfg2.chassis].speed*(1+0.12*(lv.engine||0)),turn:CHASSIS[tcfg2.chassis].turn,dmg:CANNON[tcfg2.cannon].dmg*(1+0.2*(lv.dmg||0)),reload:CANNON[tcfg2.cannon].reload*Math.pow(0.85,lv.reload||0),mgDmg:9*(1+0.3*(lv.mg||0))};
+      const f2=-pad2.ly, r2=pad2.lx; T2.ang+=(Math.abs(r2)>.18?r2:0)*st2.turn*dt;
+      const v2=(Math.abs(f2)>.18?f2:0)*st2.speed*(f2<0?.6:1); T2.vel+=(v2-T2.vel)*Math.min(1,dt*5);
       const nx2=T2.x+Math.cos(T2.ang)*T2.vel*dt, ny2=T2.y+Math.sin(T2.ang)*T2.vel*dt;
       if(!blocked(nx2,T2.y,11,false))T2.x=nx2; if(!blocked(T2.x,ny2,11,false))T2.y=ny2;
       T2.phase+=T2.vel*dt*.8+Math.abs(r2)*dt*10;
       if(Math.hypot(pad2.rx,pad2.ry)>.28)T2.tur=turnTo(T2.tur,screenToGroundDir(pad2.rx,pad2.ry),4.5*dt);
-      T2.cd-=dt;T2.mgCd-=dt;T2.fl=Math.max(0,T2.fl-dt); const c2=CANNON[tcfg.cannon];
-      if(pad2.cannon&&T2.cd<=0){const dx2=Math.cos(T2.tur),dy2=Math.sin(T2.tur),xx=T2.x+dx2*(c2.len+18),yy=T2.y+dy2*(c2.len+18);tp.push({k:"shell",x:xx,y:yy,h:9.8,vx:dx2*c2.speed,vy:dy2*c2.speed,life:c2.range/c2.speed,dmg:st.dmg,splash:c2.splash,bk:c2.k,owner:2});T2.cd=st.reload;sfx("cannon");}
-      if(pad2.mg&&T2.mgCd<=0){const a2=T2.tur+(Math.random()-.5)*.08;tp.push({k:"mg",x:T2.x+Math.cos(a2)*15,y:T2.y+Math.sin(a2)*15,h:12,vx:Math.cos(a2)*560,vy:Math.sin(a2)*560,life:.5,dmg:st.mgDmg,owner:2});T2.mgCd=.085;}
+      T2.cd-=dt;T2.mgCd-=dt;T2.fl=Math.max(0,T2.fl-dt); const c2=CANNON[tcfg2.cannon];
+      if(pad2.cannon&&T2.cd<=0){const dx2=Math.cos(T2.tur),dy2=Math.sin(T2.tur),xx=T2.x+dx2*(c2.len+18),yy=T2.y+dy2*(c2.len+18);tp.push({k:"shell",x:xx,y:yy,h:9.8,vx:dx2*c2.speed,vy:dy2*c2.speed,life:c2.range/c2.speed,dmg:st2.dmg,splash:c2.splash,bk:c2.k,owner:2});T2.cd=st2.reload;sfx("cannon");}
+      if(pad2.mg&&T2.mgCd<=0){const a2=T2.tur+(Math.random()-.5)*.08;tp.push({k:"mg",x:T2.x+Math.cos(a2)*15,y:T2.y+Math.sin(a2)*15,h:12,vx:Math.cos(a2)*560,vy:Math.sin(a2)*560,life:.5,dmg:st2.mgDmg,owner:2});T2.mgCd=.085;}
     }
     // --- movimento estilo tanque (igual em teclado, controle e tela):
     // frente = acelera, trás = ré (sem girar), lados = giram o casco
@@ -5437,7 +5452,7 @@
       );
     T.pod = acc.missile.own;
     push(T.x, T.y, () => { drawTank(ctx, M, FS * K, T, tcfg, T.fl); });
-    if (T2 && T2.hp > 0) push(T2.x, T2.y, () => drawTank(ctx, M, FS * K, T2, { ...tcfg, camo: tcfg.camo === "verde" ? "deserto" : "verde" }, T2.fl));
+    if (T2 && T2.hp > 0) push(T2.x, T2.y, () => drawTank(ctx, M, FS * K, T2, tcfg2, T2.fl));
     for (const m of tmines) push(m.x, m.y, () => drawMine(M, m), -2);
     list.sort((a, b) => a.d - b.d);
     for (const it of list) it.f();
