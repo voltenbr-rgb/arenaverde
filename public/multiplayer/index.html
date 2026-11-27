@@ -27,14 +27,14 @@ input{width:100%;padding:12px;margin:12px 0;background:#0a1009;border:1px solid 
 <article class="player" id="p1"><div class="device">JOGADOR 1 · TECLADO</div><h3>Pressione ENTER</h3><input id="name1" maxlength="18" placeholder="Nome do jogador 1" value="Jogador 1"><div class="ready"><i class="dot"></i><span id="state1">Aguardando entrada</span></div><p class="status">Use ENTER para entrar na sala.</p></article>
 <article class="player" id="p2"><div class="device">JOGADOR 2 · CONTROLE</div><h3>Pressione X / A</h3><input id="name2" maxlength="18" placeholder="Nome do jogador 2" value="Jogador 2"><div class="ready"><i class="dot"></i><span id="state2">Aguardando controle</span></div><p class="status" id="padStatus">Conecte um controle e pressione X (ou A).</p></article>
 </div></section>
-<section class="panel"><h3 class="accent">PRONTIDÃO DA SALA</h3><p id="summary" class="note">Aguardando os dois jogadores entrarem.</p><div class="actions"><button id="reset">REINICIAR SALA</button><button class="primary" id="start" disabled>COMEÇAR PARTIDA</button></div><p class="note" id="engineNote">A sala local e a identificação dos dispositivos são a primeira etapa. O combate com dois tanques independentes ainda precisa ser integrado ao motor principal; por isso, o início da partida fica bloqueado para não abrir uma partida incorreta.</p></section>
+<section class="panel"><h3 class="accent">PRONTIDÃO DA SALA</h3><p id="summary" class="note">Aguardando os dois jogadores entrarem.</p><div class="actions"><button id="reset">REINICIAR SALA</button><button class="primary" id="start" disabled>COMEÇAR PARTIDA</button></div><p class="note" id="engineNote">Partida local PVP: dois tanques independentes na mesma arena. P1 usa teclado; P2 usa controle conectado. O duelo é local neste mesmo dispositivo.</p></section>
 <div class="foot">Arena Verde · Multiplayer local</div></main>
 <script>
 (()=>{
  const $=id=>document.getElementById(id), joined={1:false,2:false};let padIndex=null,prev=[];
  function paint(){
   for(let n=1;n<=2;n++){ $('p'+n).classList.toggle('joined',joined[n]);$('state'+n).textContent=joined[n]?'CONECTADO · PRONTO':'Aguardando entrada';}
-  $('summary').textContent=joined[1]&&joined[2]?'Os dois jogadores foram identificados. A integração do modo de combate em dupla é a próxima etapa.':joined[1]?'Jogador 1 entrou. Falta o Jogador 2 conectar o controle.':joined[2]?'Jogador 2 entrou. Falta o Jogador 1 pressionar ENTER.':'Aguardando os dois jogadores entrarem.';
+  $('summary').textContent=joined[1]&&joined[2]?'Os dois jogadores estão prontos. A arena está liberada!':joined[1]?'Jogador 1 entrou. Falta o Jogador 2 conectar o controle.':joined[2]?'Jogador 2 entrou. Falta o Jogador 1 pressionar ENTER.':'Aguardando os dois jogadores entrarem.'; $('start').disabled=!(joined[1]&&joined[2]);
  }
  function join(n){if(joined[n])return;joined[n]=true;paint();}
  addEventListener('keydown',e=>{if(e.code==='Enter'&&!e.repeat){const a=document.activeElement;if(a&&a.tagName==='INPUT')return;join(1);}});
@@ -53,6 +53,6 @@ input{width:100%;padding:12px;margin:12px 0;background:#0a1009;border:1px solid 
  addEventListener('gamepadconnected',()=>{$('padStatus').textContent='Controle detectado. Pressione X / A para entrar.';});
  addEventListener('gamepaddisconnected',()=>{if(padIndex!==null){joined[2]=false;padIndex=null;paint();}});
  $('reset').onclick=()=>{joined[1]=joined[2]=false;prev=[];paint();};
- $('start').disabled=true;setInterval(pads,80);paint();
+ $('start').onclick=()=>{if(!joined[1]||!joined[2])return;const p1=encodeURIComponent($('name1').value.trim()||'Jogador 1'),p2=encodeURIComponent($('name2').value.trim()||'Jogador 2');location.href='/multiplayer/arena.html?p1='+p1+'&p2='+p2;}; $('start').disabled=true;setInterval(pads,80);paint();
 })();
 </script></body></html>
