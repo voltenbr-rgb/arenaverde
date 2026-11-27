@@ -747,6 +747,38 @@
     }
     if (AC && AC.state === "suspended") AC.resume().catch(() => {});
   }
+  let radioIndex = 0,
+    radioSeen = new Set(),
+    radioQueue = [],
+    radioCurrent = null;
+  function radioPlayNext() {
+    if (radioCurrent || !radioQueue.length) return;
+    const src = radioQueue.shift();
+    const a = new Audio(src);
+    radioCurrent = a;
+    a.preload = "auto";
+    a.volume = 0.24;
+    a.muted = !sound;
+    const finish = () => {
+      if (radioCurrent === a) radioCurrent = null;
+      radioPlayNext();
+    };
+    a.onended = finish;
+    a.onerror = finish;
+    a.play().catch(finish);
+  }
+  function radioCue(key) {
+    if (MODE !== "tank" || radioSeen.has(key) || radioIndex >= 11) return;
+    radioSeen.add(key);
+    radioIndex++;
+    radioQueue.push("/audio/radio/radio_" + String(radioIndex).padStart(2, "0") + ".mp3");
+    radioPlayNext();
+  }
+  function radioDamageCue(target) {
+    radioCue("under-fire");
+    const maxHp = target === T ? tStats().max : Math.round(CHASSIS[tcfg2.chassis].hp * (1 + 0.2 * (lv.armor || 0)));
+    if (target.hp <= maxHp * 0.3) radioCue("critical");
+  }
   function setupAudio() {
     comp = AC.createDynamicsCompressor();
     comp.threshold.value = -16;
@@ -2738,6 +2770,7 @@
     audio();
     sound = !sound;
     $("bSound").textContent = sound ? "SOM" : "MUDO";
+    if (radioCurrent) radioCurrent.muted = !sound;
     if (master) master.gain.setTargetAtTime(sound ? 0.85 : 0, AC.currentTime, 0.05);
   };
 
@@ -3967,6 +4000,7 @@
     cam.y = sy - VIEW.h * 0.55;
     audio();
     engineOn();
+    radioCue("mission-start");
     banner(`MISSÃO ${camp.m + 1}: ${LV.M.n.toUpperCase()}`, 2.6);
     hint = LV.M.intro;
     setTimeout(() => state === "play" && MODE === "tank" && banner(LV.M.intro.toUpperCase(), 3), 2800);
@@ -3986,6 +4020,7 @@
   }
   function tEnd(won) {
     if (state !== "play") return;
+    if (won) radioCue("mission-complete");
     state = "over";
     engineOff();
     sfx(won ? "wave" : "lose");
@@ -4144,11 +4179,15 @@
       bt: 0,
       firing: 0,
     });
-    if (d.big) $("bossbar").hidden = false;
+    if (d.big) {
+      $("bossbar").hidden = false;
+      radioCue("boss-contact");
+    } else radioCue("contact");
   }
   function tHurt(z, dmg, quiet) {
     if (z.dead) return;
     z.hp -= dmg;
+    if (z.d.big) radioCue("boss-engaged");
     z.fl = 0.07;
     const [fx0, fy0] = P(z.x, z.y, z.d.big ? 20 : 11);
     if (!quiet) {
@@ -4173,6 +4212,7 @@
         flip: T.x > z.x - (T.y - z.y) * 0.9,
       });
       if (z.d.big) {
+        radioCue("boss-down");
         boom(fx0, fy0, 3);
         slowT = 0.7;
         flashA = 0.5;
@@ -4191,6 +4231,7 @@
     o.fl = 0.08;
     if (o.hp > 0) return;
     o.dead = true;
+    if (o.nest) radioCue("nest-down");
     score += OBJ[o.type].pts;
     const [fx0, fy0] = P(o.x, o.y, 4),
       th = LV.theme;
@@ -4278,6 +4319,7 @@
     const dt = Math.hypot(T.x - x, T.y - y);
     if (hurtTank && dt < rad * 0.8) {
       T.hp -= dmg * 0.25;
+      radioDamageCue(T);
       T.fl = 0.1;
     }
     const [fx0, fy0] = P(x, y, 1);
@@ -4874,6 +4916,7 @@
       if (dist <= reach) {
         z.bite = true;
         targetTank.hp -= d.dps * dt;
+        radioDamageCue(targetTank);
         targetTank.fl = 0.06;
         move = false;
         if (Math.abs(T.vel) > 20) tHurt(z, 70 * dt * (Math.abs(T.vel) / st.speed), true); // atropelar
@@ -4979,6 +5022,7 @@
       if (Math.hypot(p.x-targetHit.x,p.y-targetHit.y)<14) {
         p.dead = true;
         targetHit.hp -= p.dmg;
+        radioDamageCue(targetHit);
         targetHit.fl = 0.1;
         rumble(0.3, 80);
         const [a, b] = P(p.x, p.y, 8);
@@ -5031,7 +5075,9 @@
     // --- objetivo: ninhos (e chefão) destruídos + chegar à extração
     const nestsLeft = LV.objs.filter((o) => o.nest).length,
       bossLeft = LV.M.boss && (tz.some((z) => z.d.big) || LV.sleepers.some((s) => s.type === "boss" && !s.woke));
+    const wasDone = LV.done;
     LV.done = !nestsLeft && !bossLeft;
+    if (!wasDone && LV.done) radioCue("area-clear");
     if (Math.hypot(T.x-LV.ex.x,T.y-LV.ex.y)<34 || (T2&&T2.hp>0&&Math.hypot(T2.x-LV.ex.x,T2.y-LV.ex.y)<34)) {
       if (LV.done) return tEnd(true);
       if (!LV.warned) {
