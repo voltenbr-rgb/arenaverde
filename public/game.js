@@ -4195,6 +4195,7 @@
       if (dmg >= 40) txt(fx0, fy0 - 6, dmg);
     }
     if (z.hp <= 0) {
+      if (!z.d.big) radioCue("first-kill");
       z.dead = true;
       kills++;
       money += z.d.cash;
