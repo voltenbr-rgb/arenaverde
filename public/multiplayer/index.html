@@ -37,7 +37,7 @@ input{width:100%;padding:12px;margin:12px 0;background:#0a1009;border:1px solid 
   $('summary').textContent=joined[1]&&joined[2]?'Os dois jogadores estão prontos. A arena está liberada!':joined[1]?'Jogador 1 entrou. Falta o Jogador 2 conectar o controle.':joined[2]?'Jogador 2 entrou. Falta o Jogador 1 pressionar ENTER.':'Aguardando os dois jogadores entrarem.'; $('start').disabled=!(joined[1]&&joined[2]);
  }
  function join(n){if(joined[n])return;joined[n]=true;paint();}
- addEventListener('keydown',e=>{if(e.code==='Enter'&&!e.repeat){const a=document.activeElement;if(a&&a.tagName==='INPUT')return;join(1);}});
+ addEventListener('keydown',e=>{if(e.code==='Enter'&&!e.repeat){e.preventDefault();join(1);}});
  function pads(){
   let list=[];try{list=[...(navigator.getGamepads?.()||[])];}catch(e){}
   const gp=padIndex!==null&&list[padIndex]?.connected?list[padIndex]:list.find(g=>g?.connected);
