@@ -2,7 +2,7 @@
 {
   const $ = (id) => document.getElementById(id);
   // CONFIGURAÇÃO DE MANUTENÇÃO: true bloqueia o acesso público; ?dev=1 ou ?teste=1 libera a sessão de teste.
-  const MODO_MANUTENCAO = true;
+  const MODO_MANUTENCAO = false;
   const DEV_QUERY = new URLSearchParams(location.search);
   let DEV_BYPASS = DEV_QUERY.get("dev") === "1" || DEV_QUERY.get("teste") === "1";
   try {
