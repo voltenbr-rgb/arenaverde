@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>Arena Verde · Duelo local</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#0b1109;color:#edf4e5;font-family:system-ui,Arial}#game{display:block;width:100%;height:100%;touch-action:none}
+#hud{position:fixed;top:10px;left:10px;right:10px;display:flex;justify-content:space-between;gap:10px;pointer-events:none}.card{background:#111bdf0;background:rgba(10,18,8,.84);border:1px solid #526b3d;border-radius:10px;padding:9px 12px;min-width:130px}.name{font-weight:900;color:#b7f34a}.bar{height:8px;background:#303a2b;border-radius:10px;overflow:hidden;margin-top:6px}.fill{height:100%;width:100%;background:#83d13a}.right .name{color:#ffbd64}.right .fill{background:#ed8c3c}
+#help{position:fixed;bottom:10px;left:50%;transform:translateX(-50%);background:rgba(8,13,7,.82);border:1px solid #46583a;border-radius:10px;padding:8px 12px;font-size:12px;text-align:center;max-width:95%;color:#d7e2cc}
+#overlay{position:fixed;inset:0;background:rgba(5,9,4,.84);display:flex;align-items:center;justify-content:center;padding:20px}#box{max-width:480px;text-align:center;background:#14200f;border:1px solid #526b3d;border-radius:18px;padding:26px}button{background:#b7f34a;color:#17210f;border:0;border-radius:10px;padding:13px 20px;font-weight:900;cursor:pointer}
+.hidden{display:none}@media(max-width:600px){.card{min-width:105px;padding:7px 9px;font-size:12px}#help{font-size:10px}}
+</style></head><body>
+<canvas id="game"></canvas>
+<div id="hud"><div class="card"><div class="name" id="n1">Jogador 1</div><div>TECLADO · P1</div><div class="bar"><div class="fill" id="h1"></div></div></div><div class="card right"><div class="name" id="n2">Jogador 2</div><div>CONTROLE · P2</div><div class="bar"><div class="fill" id="h2"></div></div></div></div>
+<div id="help">P1: WASD move · setas miram · ESPAÇO dispara &nbsp; | &nbsp; P2: analógico esquerdo move · direito mira · RT dispara</div>
+<div id="overlay" class="hidden"><div id="box"><h1 id="result">FIM DE JOGO</h1><p id="detail"></p><button onclick="location.href='/multiplayer/'">VOLTAR À SALA</button> <button onclick="location.reload()">JOGAR NOVAMENTE</button></div></div>
+<script>
+(()=>{
+const canvas=document.getElementById('game'),ctx=canvas.getContext('2d'),$=id=>document.getElementById(id);
+const params=new URLSearchParams(location.search),names=[params.get('p1')||'Jogador 1',params.get('p2')||'Jogador 2'];
+$('n1').textContent=names[0];$('n2').textContent=names[1];
+let W=0,H=0,dpr=1,world={w:1500,h:950},last=performance.now(),ended=false,shots=[],particles=[],keys=new Set(),padSlot=null,prevPad=[];
+const tanks=[
+{x:260,y:475,a:0,tur:0,hp:100,cd:0,color:'#8fc84b',name:names[0],score:0},
+{x:1240,y:475,a:Math.PI,tur:Math.PI,hp:100,cd:0,color:'#e58a3c',name:names[1],score:0}
+];
+const blocks=[{x:750,y:475,w:100,h:170},{x:520,y:250,w:170,h:55},{x:980,y:700,w:170,h:55},{x:350,y:700,w:90,h:120},{x:1150,y:250,w:90,h:120},{x:750,y:170,w:55,h:90},{x:750,y:780,w:55,h:90}];
+function resize(){dpr=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight;canvas.width=W*dpr;canvas.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0)}addEventListener('resize',resize);resize();
+function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
+function roundRect(x,y,w,h,r){ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fill()}
+function tank(t){
+ctx.save();ctx.translate(t.x,t.y);ctx.rotate(t.a);
+ctx.fillStyle='#20251d';roundRect(-25,-19,50,38,7);ctx.fillStyle=t.color;roundRect(-20,-15,40,30,5);
+ctx.fillStyle='rgba(255,255,255,.2)';ctx.fillRect(-12,-12,22,4);ctx.fillStyle='#333';ctx.fillRect(5,-4,32,8);
+ctx.restore();ctx.save();ctx.translate(t.x,t.y);ctx.rotate(t.tur);ctx.fillStyle='#263020';roundRect(-12,-12,24,24,8);ctx.fillStyle=t.color;roundRect(-9,-9,18,18,6);ctx.fillStyle='#20251d';roundRect(2,-3,30,6,3);ctx.restore();
+ctx.fillStyle='#eaf4df';ctx.font='bold 12px system-ui';ctx.textAlign='center';ctx.fillText(t.name,t.x,t.y-32);
+}
+function hitBlock(x,y,r=18){return blocks.some(b=>x+r>b.x-b.w/2&&x-r<b.x+b.w/2&&y+r>b.y-b.h/2&&y-r<b.y+b.h/2)}
+function moveTank(t,move,turn,aimX,aimY,fire,dt,id){
+t.a+=turn*2.6*dt;let speed=move*190;
+const nx=t.x+Math.cos(t.a)*speed*dt,ny=t.y+Math.sin(t.a)*speed*dt;
+if(nx>24&&nx<world.w-24&&!hitBlock(nx,t.y))t.x=nx;
+if(ny>24&&ny<world.h-24&&!hitBlock(t.x,ny))t.y=ny;
+if(Math.hypot(aimX,aimY)>.25)t.tur=Math.atan2(aimY,aimX);
+t.cd-=dt;if(fire&&t.cd<=0){t.cd=.32;shots.push({x:t.x+Math.cos(t.tur)*34,y:t.y+Math.sin(t.tur)*34,vx:Math.cos(t.tur)*540,vy:Math.sin(t.tur)*540,life:1.5,owner:id});}
+}
+function pollPad(){let pads=[];try{pads=[...(navigator.getGamepads?.()||[])];}catch(e){}let gp=padSlot!==null&&pads[padSlot]?.connected?pads[padSlot]:pads.find(p=>p?.connected);if(!gp){padSlot=null;prevPad=[];return null}padSlot=gp.index;let dz=v=>Math.abs(v)<.18?0:v;let axes=gp.axes;let pressed=gp.buttons.map(b=>!!(b&&(b.pressed||b.value>.45)));let fire=!!(pressed[7]||pressed[5]);return {move:clamp(-dz(axes[1]||0),-1,1),turn:dz(axes[0]||0),aimX:dz(axes[2]||0),aimY:dz(axes[3]||0),fire,connected:true};}
+function draw(){
+ctx.clearRect(0,0,W,H);let scale=Math.min(W/world.w,H/world.h);let ox=(W-world.w*scale)/2,oy=(H-world.h*scale)/2;
+ctx.fillStyle='#25391c';ctx.fillRect(ox,oy,world.w*scale,world.h*scale);
+ctx.save();ctx.translate(ox,oy);ctx.scale(scale,scale);
+for(let x=0;x<world.w;x+=50)for(let y=0;y<world.h;y+=50){ctx.fillStyle=((x+y)/50)%2?'rgba(255,255,255,.018)':'rgba(0,0,0,.035)';ctx.fillRect(x,y,50,50)}
+ctx.strokeStyle='rgba(210,235,180,.2)';ctx.lineWidth=4;ctx.strokeRect(0,0,world.w,world.h);
+for(const b of blocks){ctx.fillStyle='#172116';ctx.fillRect(b.x-b.w/2+5,b.y-b.h/2+7,b.w,b.h);ctx.fillStyle='#65764a';ctx.fillRect(b.x-b.w/2,b.y-b.h/2,b.w,b.h);ctx.fillStyle='#849765';ctx.fillRect(b.x-b.w/2,b.y-b.h/2,b.w,8)}
+for(const s of shots){ctx.fillStyle=s.owner===0?'#d7ff88':'#ffd09a';ctx.beginPath();ctx.arc(s.x,s.y,5,0,Math.PI*2);ctx.fill();ctx.fillStyle='rgba(255,220,150,.3)';ctx.beginPath();ctx.arc(s.x,s.y,10,0,Math.PI*2);ctx.fill()}
+for(const p of particles){ctx.globalAlpha=Math.max(0,p.life/.3);ctx.fillStyle=p.color;ctx.fillRect(p.x,p.y,4,4)}ctx.globalAlpha=1;
+tanks.forEach(tank);ctx.restore();
+$('h1').style.width=tanks[0].hp+'%';$('h2').style.width=tanks[1].hp+'%';
+}
+function finish(winner){if(ended)return;ended=true;$('result').textContent=winner<0?'EMPATE':names[winner]+' VENCEU!';$('detail').textContent=winner<0?'Os dois tanques foram destruídos.':'O tanque adversário foi destruído.';$('overlay').classList.remove('hidden')}
+function update(dt){
+let p1={move:(keys.has('w')?1:0)-(keys.has('s')?1:0),turn:(keys.has('d')?1:0)-(keys.has('a')?1:0),aimX:(keys.has('arrowright')?1:0)-(keys.has('arrowleft')?1:0),aimY:(keys.has('arrowdown')?1:0)-(keys.has('arrowup')?1:0),fire:keys.has(' ')};
+let p2=pollPad()||{move:0,turn:0,aimX:0,aimY:0,fire:false};
+moveTank(tanks[0],p1.move,p1.turn,p1.aimX,p1.aimY,p1.fire,dt,0);
+moveTank(tanks[1],p2.move,p2.turn,p2.aimX,p2.aimY,p2.fire,dt,1);
+for(const s of shots){s.x+=s.vx*dt;s.y+=s.vy*dt;s.life-=dt;let target=tanks[1-s.owner];if(Math.hypot(target.x-s.x,target.y-s.y)<22){target.hp=Math.max(0,target.hp-12);s.life=0;for(let i=0;i<7;i++)particles.push({x:s.x,y:s.y,life:.3,color:target.color});}if(s.x<0||s.y<0||s.x>world.w||s.y>world.h||hitBlock(s.x,s.y,3))s.life=0}
+shots=shots.filter(s=>s.life>0);for(const p of particles)p.life-=dt;particles=particles.filter(p=>p.life>0);
+if(tanks.some(t=>t.hp<=0)){let winner=tanks[0].hp===tanks[1].hp?-1:tanks[0].hp>0?0:1;finish(winner)}
+}
+addEventListener('keydown',e=>{let k=e.key.toLowerCase();if(['arrowup','arrowdown','arrowleft','arrowright',' '].includes(k))e.preventDefault();keys.add(k)});
+addEventListener('keyup',e=>keys.delete(e.key.toLowerCase()));addEventListener('blur',()=>keys.clear());
+function loop(now){let dt=Math.min(.04,(now-last)/1000);last=now;if(!ended)update(dt);draw();requestAnimationFrame(loop)}
+requestAnimationFrame(loop);
+})();
+</script></body></html>
