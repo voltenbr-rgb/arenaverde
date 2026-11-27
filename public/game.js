@@ -3998,6 +3998,8 @@
     tmines = [];
     clouds = [];
     accCd = { missile: 0, mine: 0, smoke: 0 };
+    accCd2 = { missile: 0, mine: 0, smoke: 0 };
+    specSel2 = specSel;
     kills = 0;
     state = "play";
     waveState = "fight";
@@ -4445,17 +4447,21 @@
   const cloneAcc = (a) => JSON.parse(JSON.stringify(a || accDefault()));
   let acc = accDefault(),
     specSel = "missile",
+    specSel2 = "missile",
     accCd = { missile: 0, mine: 0, smoke: 0 },
+    accCd2 = { missile: 0, mine: 0, smoke: 0 },
     tmines = [],
     clouds = [],
     aimDist = 170;
-  function cycleSpec(dir) {
+  function cycleSpec(dir, player = 1) {
     const own = SPECIALS.filter((k) => acc[k].own);
     if (!own.length) return banner("SEM ACESSÓRIO: COMPRE NA OFICINA OU ACHE NO MAPA", 1.8);
-    let i = own.indexOf(specSel);
-    specSel = own[(i + dir + own.length) % own.length];
+    const selected = player === 2 ? specSel2 : specSel;
+    const i = own.indexOf(selected);
+    const next = own[(i + dir + own.length) % own.length];
+    if (player === 2) specSel2 = next; else specSel = next;
     sfx("reload");
-    banner(`${ACC[specSel].n.toUpperCase()} x${acc[specSel].ammo}`, 1);
+    banner(`P${player} · ${ACC[next].n.toUpperCase()} x${acc[next].ammo}`, 1);
   }
   // ponto onde o míssil cai: o mouse (PC) ou a frente da torreta (controle/celular)
   function aimPoint() {
@@ -4468,8 +4474,9 @@
     }
     return { x: T.x + Math.cos(T.tur) * aimDist, y: T.y + Math.sin(T.tur) * aimDist };
   }
-  function useAcc(k) {
-    const a = acc[k];
+  function useAcc(k, tank = T, player = 1) {
+    const a = acc[k], cooldown = player === 2 ? accCd2 : accCd;
+    if (!tank || tank.hp <= 0) return;
     if (!a.own) {
       if (!useAcc.warned || performance.now() - useAcc.warned > 1500) {
         useAcc.warned = performance.now();
@@ -4477,21 +4484,22 @@
       }
       return;
     }
-    if (accCd[k] > 0) return;
+    if (cooldown[k] > 0) return;
     if (a.ammo <= 0) {
-      accCd[k] = 0.6;
-      txt(...P(T.x, T.y, 30), "SEM MUNIÇÃO", "255,120,80");
+      cooldown[k] = 0.6;
+      txt(...P(tank.x, tank.y, 30), "SEM MUNIÇÃO", "255,120,80");
       return;
     }
     a.ammo--;
-    accCd[k] = ACC[k].cd;
+    cooldown[k] = ACC[k].cd;
     if (k === "missile") {
       // sai do lançador no teto, sobe e cai no alvo
-      const tg = aimPoint(),
-        side = T.tur + Math.PI / 2,
-        R = CHASSIS[tcfg.chassis].W * 0.35,
-        x0 = T.x + Math.cos(side) * R * 0.75,
-        y0 = T.y + Math.sin(side) * R * 0.75,
+      const tg = player === 2 ? { x: tank.x + Math.cos(tank.tur) * aimDist, y: tank.y + Math.sin(tank.tur) * aimDist } : aimPoint(),
+        side = tank.tur + Math.PI / 2,
+        cfg = player === 2 ? tcfg2 : tcfg,
+        R = CHASSIS[cfg.chassis].W * 0.35,
+        x0 = tank.x + Math.cos(side) * R * 0.75,
+        y0 = tank.y + Math.sin(side) * R * 0.75,
         d = Math.hypot(tg.x - x0, tg.y - y0);
       tp.push({ k: "msl", x0, y0, x: x0, y: y0, tx: tg.x, ty: tg.y, h: 16, t: 0, T: 0.7 + d / 420, vx: 0, vy: 0 });
       const [a2, b2] = P(x0, y0, 17);
@@ -4511,23 +4519,23 @@
       sfx("launch");
       rumble(0.3, 80);
     } else if (k === "mine") {
-      const x = T.x - Math.cos(T.ang) * 18,
-        y = T.y - Math.sin(T.ang) * 18;
+      const x = tank.x - Math.cos(tank.ang) * 18,
+        y = tank.y - Math.sin(tank.ang) * 18;
       tmines.push({ x, y, arm: 0.8, t: 0 });
       sfx("place");
     } else if (k === "smoke") {
       // 4 granadas de fumaça em leque à frente da torreta
       for (let i = 0; i < 4; i++) {
-        const a3 = T.tur + (i - 1.5) * 0.45,
+        const a3 = tank.tur + (i - 1.5) * 0.45,
           d = 55 + Math.abs(i - 1.5) * 8;
         tp.push({
           k: "smk",
-          x0: T.x,
-          y0: T.y,
-          x: T.x,
-          y: T.y,
-          tx: T.x + Math.cos(a3) * d,
-          ty: T.y + Math.sin(a3) * d,
+          x0: tank.x,
+          y0: tank.y,
+          x: tank.x,
+          y: tank.y,
+          tx: tank.x + Math.cos(a3) * d,
+          ty: tank.y + Math.sin(a3) * d,
           h: 12,
           t: 0,
           T: 0.55,
@@ -4576,7 +4584,7 @@
   }
   // atualiza mísseis, granadas de fumaça, minas e nuvens
   function accUpdate(dt) {
-    for (const k in accCd) accCd[k] = Math.max(0, accCd[k] - dt);
+    for (const k in accCd) { accCd[k] = Math.max(0, accCd[k] - dt); accCd2[k] = Math.max(0, accCd2[k] - dt); }
     for (const p of tp) {
       if (p.k !== "msl" && p.k !== "smk") continue;
       p.t += dt;
@@ -4695,7 +4703,7 @@
       gp = allPads.find((g) => g && g.connected && g.axes.length >= 2);
       const gp2 = tankPlayers === 2 ? gp : allPads.filter((g) => g && g.connected && g.axes.length >= 2).find((g) => g.index !== (gp && gp.index));
       if (tankPlayers === 2) gp = null;
-      if (gp2) { const dz2=v=>Math.abs(v)<.18?0:v, b2=i=>!!(gp2.buttons[i]&&(gp2.buttons[i].pressed||gp2.buttons[i].value>.4)), edge2=i=>b2(i)&&!pad2.prev[i]; pad2.lx=dz2(gp2.axes[0]||0);pad2.ly=dz2(gp2.axes[1]||0);pad2.rx=dz2(gp2.axes[2]||0);pad2.ry=dz2((gp2.mapping==="standard"?gp2.axes[3]:gp2.axes.length>5?gp2.axes[5]:gp2.axes[3])||0);pad2.cannon=b2(7);pad2.mg=b2(5);pad2.id=gp2.id; if(state==="tselect" && tankSetupPlayer===2){const keys=Object.keys(CAMO),i=keys.indexOf(tcfg2.camo);if(edge2(14))tcfg2.camo=keys[(i+keys.length-1)%keys.length];if(edge2(15))tcfg2.camo=keys[(i+1)%keys.length];if(edge2(0)){store.set("tank2",tcfg2);showTankSetup();}} pad2.prev=gp2.buttons.map((_,i)=>b2(i)); } else {pad2.lx=pad2.ly=pad2.rx=pad2.ry=0;pad2.cannon=pad2.mg=false;pad2.id="";}
+      if (gp2) { const dz2=v=>Math.abs(v)<.18?0:v, b2=i=>!!(gp2.buttons[i]&&(gp2.buttons[i].pressed||gp2.buttons[i].value>.4)), edge2=i=>b2(i)&&!pad2.prev[i]; pad2.lx=dz2(gp2.axes[0]||0);pad2.ly=dz2(gp2.axes[1]||0);pad2.rx=dz2(gp2.axes[2]||0);pad2.ry=dz2((gp2.mapping==="standard"?gp2.axes[3]:gp2.axes.length>5?gp2.axes[5]:gp2.axes[3])||0);pad2.cannon=b2(7);pad2.mg=b2(5);pad2.spec=edge2(4);pad2.smoke=b2(6);if(edge2(14))cycleSpec(-1,2);if(edge2(15))cycleSpec(1,2);pad2.id=gp2.id; if(state==="tselect" && tankSetupPlayer===2){const keys=Object.keys(CAMO),i=keys.indexOf(tcfg2.camo);if(edge2(14))tcfg2.camo=keys[(i+keys.length-1)%keys.length];if(edge2(15))tcfg2.camo=keys[(i+1)%keys.length];if(edge2(0)){store.set("tank2",tcfg2);showTankSetup();}} pad2.prev=gp2.buttons.map((_,i)=>b2(i)); } else {pad2.lx=pad2.ly=pad2.rx=pad2.ry=0;pad2.cannon=pad2.mg=false;pad2.id="";}
     } catch (e) {}
     if (!gp) {
       pad.lx = pad.ly = pad.rx = pad.ry = 0;
@@ -4755,6 +4763,8 @@
       T2.cd-=dt;T2.mgCd-=dt;T2.fl=Math.max(0,T2.fl-dt); const c2=CANNON[tcfg2.cannon];
       if(pad2.cannon&&T2.cd<=0){const dx2=Math.cos(T2.tur),dy2=Math.sin(T2.tur),xx=T2.x+dx2*(c2.len+18),yy=T2.y+dy2*(c2.len+18);tp.push({k:"shell",x:xx,y:yy,h:9.8,vx:dx2*c2.speed,vy:dy2*c2.speed,life:c2.range/c2.speed,dmg:st2.dmg,splash:c2.splash,bk:c2.k,owner:2});T2.cd=st2.reload;sfx("cannon");}
       if(pad2.mg&&T2.mgCd<=0){const a2=T2.tur+(Math.random()-.5)*.08;tp.push({k:"mg",x:T2.x+Math.cos(a2)*15,y:T2.y+Math.sin(a2)*15,h:12,vx:Math.cos(a2)*560,vy:Math.sin(a2)*560,life:.5,dmg:st2.mgDmg,owner:2});T2.mgCd=.085;}
+      if(pad2.spec) useAcc(specSel2,T2,2);
+      if(pad2.smoke) useAcc("smoke",T2,2);
     }
     // --- movimento estilo tanque (igual em teclado, controle e tela):
     // frente = acelera, trás = ré (sem girar), lados = giram o casco
@@ -4821,8 +4831,8 @@
     if (wantMG && !T.over && T.mgCd <= 0) fireMG(st);
     T.heat = Math.max(0, T.heat - dt * (wantMG && !T.over ? 0.05 : 0.38));
     if (T.over && T.heat < 0.3) T.over = false;
-    if (tin.spec || pad.spec || tkeys.has("e")) useAcc(specSel);
-    if (tin.smoke || pad.smoke || tkeys.has("q")) useAcc("smoke");
+    if (tin.spec || pad.spec || tkeys.has("e")) useAcc(specSel,T,1);
+    if (tin.smoke || pad.smoke || tkeys.has("q")) useAcc("smoke",T,1);
     accUpdate(dt);
     // --- zumbis que acordam quando o tanque chega perto
     for (const s of LV.sleepers)
