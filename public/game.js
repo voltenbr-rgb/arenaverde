@@ -2208,8 +2208,9 @@
     ctx.translate(cx, bottom);
     if (o.rot) ctx.rotate(o.rot);
     ctx.scale(o.sx || 1, o.sy || 1);
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = "high";
+    // Sprites de campanha podem manter pixels nítidos; outras telas preservam suavização.
+    ctx.imageSmoothingEnabled = o.pixel ? false : true;
+    if (!o.pixel) ctx.imageSmoothingQuality = "high";
     ctx.drawImage(im, -w / 2, -h, w, h);
     if (o.fl > 0) {
       ctx.globalAlpha = 0.7 * (o.a ?? 1);
@@ -3436,7 +3437,8 @@
       px = -2.5;
     const tur = (h) => {
       lay(h);
-      c.translate(px, 0);
+      // Pequeno coice visual da torre, independente da física e da direção do tiro.
+      c.translate(px - Math.min(1.15, Math.max(0, t.rec || 0) * 1.8), 0);
       c.rotate(t.tur - t.ang);
     };
     // ponto local da torreta -> tela (para antenas, que ficam em pé)
@@ -3479,12 +3481,22 @@
       for (const s of [-1, 1]) c.fillRect(-L / 2 - 1, s * (W / 2 - tw / 2) - tw / 2, L + 2, tw);
     }
     lay(2.5);
-    c.fillStyle = "#4a4d3e";
-    for (const s of [-1, 1])
+    // Rodagem aparente: roletes, cubos e elos individuais animados pela fase das esteiras.
+    for (const s of [-1, 1]) {
+      const ty = s * (W / 2 - tw / 2);
+      for (let x = -L / 2 + 2.5; x <= L / 2 - 2; x += 4.6) {
+        c.fillStyle = "#080b08"; c.beginPath(); c.arc(x, ty, 1.85, 0, Math.PI * 2); c.fill();
+        c.fillStyle = "#69705b"; c.beginPath(); c.arc(x, ty, 1.35, 0, Math.PI * 2); c.fill();
+        c.fillStyle = "#252c22"; c.beginPath(); c.arc(x, ty, 0.62, 0, Math.PI * 2); c.fill();
+        c.fillStyle = "rgba(226,220,174,.42)"; c.fillRect(x - .65, ty - 1.05, .75, .45);
+      }
       for (let i = 0; i < L + 2; i += 2.2) {
         const x = -L / 2 - 1 + ((((i + t.phase) % (L + 2)) + L + 2) % (L + 2));
-        c.fillRect(x, s * (W / 2 - tw / 2) - tw / 2, 0.8, tw);
+        c.fillStyle = "#20261d"; c.fillRect(x, ty - tw / 2, 1.45, tw);
+        c.fillStyle = "#8a9277"; c.fillRect(x + .25, ty - tw / 2 + .25, .65, .55);
+        c.fillStyle = "#11160f"; c.fillRect(x + .25, ty + tw / 2 - .85, .9, .45);
       }
+    }
     // saias laterais blindadas (painéis)
     for (let h = 2.5; h <= 6; h += 0.5) {
       lay(h);
@@ -3530,6 +3542,10 @@
     }
     lay(7);
     camo(hullShape, [L / 2, W / 2], 0);
+    // Contorno de tinta escura + filete de luz no bordo superior estilo arcade.
+    c.strokeStyle = "#10150e"; c.lineWidth = 1.55; hullShape(); c.stroke();
+    c.strokeStyle = "rgba(218,224,177,.48)"; c.lineWidth = .65;
+    c.beginPath(); c.moveTo(-L / 2 + 2, -W / 2 + 2.5); c.lineTo(L / 2 - 7, -W / 2 + 2.5); c.stroke();
     // grade do motor (traseira) e rebites
     c.fillStyle = "rgba(10,10,6,.6)";
     c.fillRect(-L / 2 + 1.5, -W / 2 + 4, 6.5, W - 8);
@@ -3542,6 +3558,16 @@
     c.fillRect(L / 2 - 1.4, W / 2 - 4.6, 1, 1.6);
     c.fillStyle = "#3a3524";
     c.fillRect(L / 2 - 6, W / 2 - 6, 3, 2); // caixa de ferramentas
+    // Painéis de manutenção, parafusos e grelhas dão escala sem alterar hitbox.
+    c.fillStyle = "rgba(9,13,9,.72)";
+    c.fillRect(-L / 2 + 9, -W / 2 + 4, 4.2, W - 8);
+    c.fillRect(-L / 2 + 15, -W / 2 + 4, 2.2, W - 8);
+    c.fillStyle = "rgba(205,205,160,.62)";
+    for (const side of [-1, 1]) for (let x = -L / 2 + 4; x < L / 2 - 2; x += 5) {
+      c.fillRect(x, side * (W / 2 - 2.2), .75, .75);
+    }
+    c.fillStyle = "rgba(0,0,0,.34)";
+    for (let k = 0; k < 5; k++) c.fillRect(-L / 2 + 16 + k * 1.1, -W / 2 + 4.5, .45, W - 9);
     if (fl > 0) {
       c.fillStyle = `rgba(255,70,50,${Math.min(0.35, fl * 5)})`;
       hullShape();
@@ -3579,6 +3605,15 @@
     }
     tur(11.5);
     camo(turShape, [R * 1.2, R * 0.9], 1);
+    c.strokeStyle = "#11160f"; c.lineWidth = 1.35; turShape(); c.stroke();
+    c.strokeStyle = "rgba(220,222,174,.42)"; c.lineWidth = .6;
+    c.beginPath(); c.moveTo(-R * .9, -R * .83); c.lineTo(R * .65, -R * .77); c.stroke();
+    // Rebites na torre e placa frontal do mantelete.
+    c.fillStyle = "rgba(8,11,8,.75)";
+    for (const side of [-1, 1]) for (let k = 0; k < 4; k++) {
+      c.beginPath(); c.arc(-R * .78 + k * R * .48, side * R * .78, .48, 0, Math.PI * 2); c.fill();
+    }
+    c.fillStyle = "rgba(229,224,170,.62)"; c.fillRect(R * .88, -R * .22, .8, R * .44);
     // cesta traseira alongada característica da torre do M1 Abrams
     if (cfg.chassis === "abrams") {
       tur(9.5);
@@ -5223,6 +5258,14 @@
       ctx.beginPath();
       ctx.arc(-r * 0.3, -r * 0.3, r * 0.45, 0, 7);
       ctx.fill();
+      // Recortes assimétricos e pontos de luz quebram a copa circular em massas orgânicas.
+      for (let q = 0; q < 4; q++) {
+        const a = q * 1.5708 + seed * 2.1, rr = r * (.56 + .08 * ((q + seed * 7) % 2));
+        ctx.fillStyle = q % 2 ? L[1] : L[0];
+        ctx.beginPath(); ctx.arc(Math.cos(a) * rr, Math.sin(a) * rr, r * .34, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.fillStyle = "rgba(205,231,137,.22)";
+      ctx.fillRect(-r * .48, -r * .42, r * .42, Math.max(1, r * .12));
     }
     if (fl > 0) {
       lay(20 * s);
@@ -5260,6 +5303,10 @@
         ctx.fillStyle = "#6b4a22";
         ctx.fillRect(-4.5, -0.6, 9, 1.2);
         ctx.fillRect(-0.6, -4.5, 1.2, 9);
+        ctx.strokeStyle = "rgba(25,18,10,.78)"; ctx.lineWidth = .8;
+        ctx.beginPath(); ctx.moveTo(-4, -4); ctx.lineTo(4, 4); ctx.moveTo(4, -4); ctx.lineTo(-4, 4); ctx.stroke();
+        ctx.fillStyle = "#d0ad70";
+        for (const x of [-3.7, 3.7]) for (const y of [-3.7, 3.7]) { ctx.fillRect(x, y, .8, .8); }
         return;
       case "bags":
         groundShadow(lay, 12, 5);
@@ -5442,6 +5489,18 @@
         ctx.fillStyle = out ? th.edge : onRoad ? ((u + v) % 2 ? th.road : th.road2) : th.g[(u + v) & 1];
         ctx.fillRect(u * CELL, v * CELL, CELL + 0.6, CELL + 0.6);
         if (!out) {
+          // Textura orgânica de terra/grama em manchas suaves, mantendo a grade para navegação.
+          if (!onRoad && hv > .24) {
+            ctx.fillStyle = `rgba(8,18,7,${.035 + hash(u + 17, v + 31) * .055})`;
+            ctx.beginPath();
+            ctx.ellipse(u * CELL + 5 + hash(u + 4, v) * 22, v * CELL + 5 + hash(u, v + 8) * 22,
+              3 + hash(u + 9, v) * 6, 1.4 + hash(u, v + 12) * 2.6, hash(u, v) * .8, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          if (onRoad && hv > .52) {
+            ctx.fillStyle = "rgba(18,13,8,.10)";
+            ctx.fillRect(u * CELL + 3 + hash(u, v + 2) * 17, v * CELL + 4 + hash(u + 3, v) * 15, 5, .7);
+          }
           ctx.fillStyle = onRoad ? "rgba(0,0,0,.12)" : th.tuft;
           for (let k = 0; k < 4; k++) {
             const px = u * CELL + hash(u + k, v) * 21 + 1,
@@ -5596,7 +5655,7 @@
             rot = ph * 0.05;
             dy = -Math.abs(ph) * 0.8 * K;
           }
-          drawImg(im, sx, sy + dy, h, { fl: z.fl, rot: flip ? -rot : rot, sx: flip ? -1 : 1 });
+          drawImg(im, sx, sy + dy, h, { fl: z.fl, rot: flip ? -rot : rot, sx: flip ? -1 : 1, pixel: true });
           if (!z.d.big) bar(sx, sy - h - 3 * K, z.hp, z.max);
         },
         0.5,
@@ -5627,12 +5686,12 @@
         ctx.globalCompositeOperation = "lighter";
         continue;
       }
-      ctx.strokeStyle = p.k === "shell" || p.k === "msl" ? "rgba(255,170,70,.95)" : "rgba(255,228,150,.95)";
-      ctx.lineWidth = (p.k === "shell" ? 1.4 : 0.7) * K;
-      ctx.beginPath();
-      ctx.moveTo(ex, ey);
-      ctx.lineTo(sx, sy);
-      ctx.stroke();
+      // Trilha com sombra escura e núcleo quente: leitura imediata em vegetação densa.
+      ctx.strokeStyle = "rgba(20,13,7,.82)"; ctx.lineWidth = (p.k === "shell" ? 3.1 : 1.8) * K;
+      ctx.beginPath(); ctx.moveTo(ex, ey); ctx.lineTo(sx, sy); ctx.stroke();
+      ctx.strokeStyle = p.k === "shell" || p.k === "msl" ? "rgba(255,170,70,.98)" : "rgba(255,235,165,.98)";
+      ctx.lineWidth = (p.k === "shell" ? 1.35 : 0.75) * K;
+      ctx.beginPath(); ctx.moveTo(ex, ey); ctx.lineTo(sx, sy); ctx.stroke();
       const r = (p.k === "shell" ? 4 : 2) * K;
       ctx.drawImage(p.k === "shell" ? GL.o : GL.y, sx - r, sy - r, r * 2, r * 2);
     }
