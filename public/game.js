@@ -4460,11 +4460,8 @@
   // ponto onde o míssil cai: o mouse (PC) ou a frente da torreta (controle/celular)
   function aimPoint() {
     if (tin.mouse) {
-      const dx = tin.mouse.x - T.x,
-        dy = tin.mouse.y - T.y,
-        d = Math.hypot(dx, dy) || 1,
-        k = Math.max(40, Math.min(320, d)) / d;
-      return { x: T.x + dx * k, y: T.y + dy * k };
+      // Usa o ponto exato do cursor: sem distância mínima/máxima que faça o míssil passar da mira.
+      return { x: tin.mouse.x, y: tin.mouse.y };
     }
     return { x: T.x + Math.cos(T.tur) * aimDist, y: T.y + Math.sin(T.tur) * aimDist };
   }
