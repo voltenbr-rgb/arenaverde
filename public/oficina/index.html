@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<meta name="theme-color" content="#10150e">
+<title>Oficina 3D · Arena Verde</title>
+<style>
+:root{--bg:#0c100c;--panel:#151c14;--panel2:#1b2419;--line:#34422e;--lime:#b7f34a;--muted:#9ca895;--text:#f0f5e9}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 50% 35%,#24301d 0,#0b100b 65%);color:var(--text);font:14px Inter,system-ui,Arial,sans-serif}
+header{height:68px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 22px;background:#0b100de8}
+.brand{font-weight:900;letter-spacing:2px;font-size:20px}.brand span{color:var(--lime)}.tag{color:var(--muted);font-size:11px;letter-spacing:1.6px;margin-left:14px}
+button,select,input{font:inherit}button{cursor:pointer;border:1px solid var(--line);background:#202a1c;color:var(--text);border-radius:9px;padding:10px 13px}button:hover,button.active{border-color:var(--lime);color:var(--lime)}button.primary{background:var(--lime);color:#17200e;border-color:var(--lime);font-weight:900}button:disabled{opacity:.4;cursor:not-allowed}
+.layout{display:grid;grid-template-columns:250px minmax(300px,1fr) 280px;gap:12px;padding:14px;max-width:1600px;margin:auto;min-height:calc(100vh - 68px)}
+.panel{background:linear-gradient(160deg,#192118,#111710);border:1px solid var(--line);border-radius:13px;overflow:hidden;box-shadow:0 12px 35px #0005}
+.panel h3{margin:0;padding:15px 16px;border-bottom:1px solid var(--line);font-size:12px;letter-spacing:1.5px;color:var(--lime)}
+.left .parts{padding:10px;display:grid;gap:7px}.part{width:100%;display:flex;align-items:center;gap:10px;text-align:left;padding:12px}.part .ico{width:32px;height:32px;border-radius:8px;background:#2b3924;display:grid;place-items:center;color:var(--lime);font-size:18px}.part small{display:block;color:var(--muted);font-size:11px;margin-top:3px}.part.active{background:#293820;border-color:var(--lime)}
+.center{display:flex;flex-direction:column;min-height:600px}.viewport{position:relative;flex:1;min-height:510px;background:radial-gradient(ellipse at center,#34412c 0,#182218 47%,#101710 78%);overflow:hidden}
+#view{display:block;width:100%;height:100%;min-height:510px}.model-title{position:absolute;top:17px;left:18px;pointer-events:none}.model-title b{font-size:18px;letter-spacing:1px}.model-title small{display:block;color:#b4c0ab;margin-top:5px}.tools{position:absolute;top:14px;right:14px;display:flex;gap:6px}.tools button{background:#101710d9;font-size:12px;padding:8px 10px}.hint{position:absolute;bottom:14px;left:16px;color:#c2ceb9;font-size:11px;background:#0a100ac9;padding:8px 10px;border-radius:8px}
+.bottom{padding:12px;display:flex;justify-content:space-between;align-items:center;gap:10px;border-top:1px solid var(--line);background:#111810}.bottom small{color:var(--muted)}
+.right .controls{padding:15px;display:grid;gap:15px}.field label{display:flex;justify-content:space-between;color:#dce5d4;font-size:12px;margin-bottom:8px}.field output{color:var(--lime)}input[type=range]{width:100%;accent-color:var(--lime)}select{width:100%;padding:10px;background:#0e150d;color:var(--text);border:1px solid var(--line);border-radius:8px}
+.swatches{display:flex;gap:8px;flex-wrap:wrap}.swatch{width:31px;height:31px;border-radius:50%;padding:0;border:2px solid #ffffff40}.swatch.active{outline:2px solid var(--lime);outline-offset:2px}
+.check{display:flex;align-items:center;gap:9px;color:#dce5d4;font-size:12px}.check input{accent-color:var(--lime);width:16px;height:16px}
+.actions{display:flex;gap:8px;flex-wrap:wrap}.actions button{flex:1}.status{font-size:11px;color:var(--muted);min-height:15px}
+@media(max-width:980px){.layout{grid-template-columns:205px minmax(280px,1fr);}.right{grid-column:1/-1}.right .controls{grid-template-columns:repeat(3,1fr)}.center{grid-column:2;grid-row:1/3}.left{grid-column:1;grid-row:1/3}}
+@media(max-width:650px){header{padding:0 12px;height:58px}.tag{display:none}.layout{display:flex;flex-direction:column;padding:8px}.center{order:0;min-height:430px}.viewport,#view{min-height:390px}.left{order:1}.left .parts{grid-template-columns:repeat(2,1fr)}.right{order:2}.right .controls{grid-template-columns:1fr 1fr}.bottom{flex-wrap:wrap}.bottom .actions{width:100%}}
+</style>
+</head>
+<body>
+<header><div><span class="brand">ARENA <span>VERDE</span></span><span class="tag">OFICINA DE VEÍCULOS · BETA</span></div><button id="homeBtn">← VOLTAR AO JOGO</button></header>
+<main class="layout">
+<aside class="panel left"><h3>▦ COMPONENTES DO TANQUE</h3><div class="parts" id="parts">
+<button class="part active" data-part="hull"><span class="ico">▰</span><span>Casco<small>Blindagem principal</small></span></button>
+<button class="part" data-part="turret"><span class="ico">◉</span><span>Torreta<small>Gira independentemente</small></span></button>
+<button class="part" data-part="barrel"><span class="ico">➤</span><span>Canhão<small>Comprimento e calibre</small></span></button>
+<button class="part" data-part="tracks"><span class="ico">▤</span><span>Esteiras<small>Conjunto de rodagem</small></span></button>
+<button class="part" data-part="armor"><span class="ico">⬟</span><span>Blindagem extra<small>Módulos laterais</small></span></button>
+<button class="part" data-part="extras"><span class="ico">✚</span><span>Acessórios<small>Equipamentos adicionais</small></span></button>
+</div></aside>
+<section class="panel center"><div class="viewport"><canvas id="view"></canvas><div class="model-title"><b id="vehicleName">M1 ABRAMS · PROTÓTIPO</b><small>VISUALIZAÇÃO 3D INTERATIVA</small></div><div class="tools"><button id="rotateBtn">⟳ Girar</button><button id="resetBtn">◎ Centralizar</button></div><div class="hint">ARRASTE PARA GIRAR · RODA DO MOUSE PARA ZOOM · TOQUE TAMBÉM FUNCIONA</div></div>
+<div class="bottom"><div><b id="selectedName">CASCO</b><br><small id="selectedHelp">Selecione uma peça para editar</small></div><div class="actions"><button id="saveBtn">Salvar projeto</button><button id="exportBtn" class="primary">Exportar modelo 3D</button></div></div></section>
+<aside class="panel right"><h3>⚙ PERSONALIZAÇÃO</h3><div class="controls">
+<div class="field"><label>Modelo base</label><select id="base"><option value="abrams">M1 Abrams</option><option value="t90">T-90</option><option value="custom">Tanque personalizado</option></select></div>
+<div class="field"><label>Nome do veículo</label><input id="name" value="M1 Abrams" style="width:100%;padding:10px;background:#0e150d;color:white;border:1px solid var(--line);border-radius:8px"></div>
+<div class="field"><label>Cor principal</label><div class="swatches" id="colors"><button class="swatch active" data-color="#9c895d" style="background:#9c895d"></button><button class="swatch" data-color="#536344" style="background:#536344"></button><button class="swatch" data-color="#777b72" style="background:#777b72"></button><button class="swatch" data-color="#b5a47c" style="background:#b5a47c"></button><button class="swatch" data-color="#303b2d" style="background:#303b2d"></button><button class="swatch" data-color="#d4d0c2" style="background:#d4d0c2"></button></div></div>
+<div class="field"><label>Comprimento do canhão <output id="barrelVal">100%</output></label><input id="barrel" type="range" min="65" max="145" value="100"></div>
+<div class="field"><label>Altura da torre <output id="turretVal">100%</output></label><input id="turret" type="range" min="75" max="130" value="100"></div>
+<div class="field"><label>Largura das esteiras <output id="trackVal">100%</output></label><input id="track" type="range" min="75" max="135" value="100"></div>
+<div class="field"><label>Armamento secundário</label><select id="weapon"><option value="mg">Metralhadora superior</option><option value="none">Sem armamento secundário</option><option value="dual">Duas metralhadoras</option></select></div>
+<div class="field"><label>Acessórios</label><label class="check"><input id="armorCheck" type="checkbox" checked> Blindagem reativa lateral</label><label class="check"><input id="smokeCheck" type="checkbox" checked> Lançadores de fumaça</label><label class="check"><input id="antennaCheck" type="checkbox" checked> Antena</label></div>
+<div class="status" id="status">Projeto local · ainda não publicado no jogo.</div>
+</div></aside>
+</main>
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+import {OrbitControls} from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js';
+import {GLTFExporter} from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/exporters/GLTFExporter.js';
+const canvas=document.querySelector('#view');
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.outputColorSpace=THREE.SRGBColorSpace;
+const scene=new THREE.Scene();scene.fog=new THREE.Fog(0x172116,18,42);
+const camera=new THREE.PerspectiveCamera(36,1,.1,100);camera.position.set(8,6.3,9);
+const controls=new OrbitControls(camera,renderer.domElement);controls.enableDamping=true;controls.target.set(0,1,0);controls.minDistance=5;controls.maxDistance=19;controls.maxPolarAngle=Math.PI*.48;
+scene.add(new THREE.HemisphereLight(0xdde9cf,0x30382a,2.1));
+const key=new THREE.DirectionalLight(0xfff1d7,3.1);key.position.set(5,10,7);key.castShadow=true;scene.add(key);
+const rim=new THREE.DirectionalLight(0x9bcf62,2.2);rim.position.set(-7,5,-5);scene.add(rim);
+const floor=new THREE.Mesh(new THREE.CircleGeometry(8,80),new THREE.MeshStandardMaterial({color:0x283526,roughness:.9,metalness:.1}));floor.rotation.x=-Math.PI/2;floor.position.y=-.05;floor.receiveShadow=true;scene.add(floor);
+const grid=new THREE.GridHelper(16,32,0x63754b,0x3a4933);grid.position.y=-.035;scene.add(grid);
+const tank=new THREE.Group();tank.name='ArenaVerdeTank';scene.add(tank);
+const parts={};const mats={};let selected='hull',auto=true;
+function mat(color,metal=.45,rough=.58){return new THREE.MeshStandardMaterial({color,metalness:metal,roughness:rough})}
+let mainColor='#9c895d';const paint=mat(mainColor,.52,.55),dark=mat('#242820',.72,.72),rubber=mat('#171b18',.12,.9),steel=mat('#555b51',.8,.36),glass=mat('#273d36',.75,.18),accent=mat('#c2b58d',.48,.48);
+function group(name){const g=new THREE.Group();g.name=name;tank.add(g);parts[name]=g;return g}
+function box(g,w,h,d,m,x,y,z,bevel=0){const mesh=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);mesh.position.set(x,y,z);mesh.castShadow=true;mesh.receiveShadow=true;g.add(mesh);return mesh}
+function cyl(g,r1,r2,len,m,x,y,z,axis='x',segments=16){const mesh=new THREE.Mesh(new THREE.CylinderGeometry(r1,r2,len,segments),m);mesh.position.set(x,y,z);if(axis==='x')mesh.rotation.z=Math.PI/2;if(axis==='z')mesh.rotation.x=Math.PI/2;mesh.castShadow=true;mesh.receiveShadow=true;g.add(mesh);return mesh}
+const hull=group('hull');box(hull,4.25,.85,2.35,paint,0,1.05,0);box(hull,3.5,.34,2.5,paint,-.15,1.62,0);box(hull,1.2,.32,2.22,accent,1.45,1.18,0);
+for(let side of [-1,1]){box(hull,3.75,.72,.12,dark,0,.85,side*1.22);for(let i=0;i<7;i++)box(hull,.42,.45,.12,paint,-1.5+i*.49,1.12,side*1.3)}
+const tracks=group('tracks');
+for(let side of [-1,1]){const z=side*1.43;box(tracks,4.45,.7,.42,rubber,0,.56,z);box(tracks,4.5,.12,.46,steel,0,.2,z);for(let i=0;i<8;i++){const x=-1.75+i*.5;cyl(tracks,.32,.32,.16,steel,x,.58,z+side*.22,'z',20);cyl(tracks,.13,.13,.18,dark,x,.58,z+side*.31,'z',16)}for(let i=0;i<22;i++){const x=-2.12+i*.2;box(tracks,.17,.09,.49,steel,x,.94,z,.01)}}
+const turret=group('turret');box(turret,2.15,.62,1.75,paint,-.25,2.05,0);box(turret,1.55,.32,1.5,accent,-.28,2.5,0);box(turret,.72,.24,.86,paint,-.1,2.77,0);
+const ring=cyl(turret,.8,.8,.2,dark,-.2,1.77,0,'y',32);
+const barrel=group('barrel');cyl(barrel,.19,.24,2.4,paint,1.5,2.38,0);cyl(barrel,.25,.25,.34,steel,2.78,2.38,0);cyl(barrel,.28,.2,.38,dark,2.96,2.38,0);
+const armor=group('armor');for(let s of [-1,1])for(let i=0;i<5;i++){const p=box(armor,.58,.38,.18,accent,-1.55+i*.7,1.48,s*1.35);p.rotation.z=(i%2?-.04:.04)}
+const extras=group('extras');for(let i=0;i<6;i++){const a=-.65+i*.26;const tube=cyl(extras,.07,.07,.38,dark,-.95,2.55,a,'z',12);tube.rotation.x=Math.PI/2}
+box(extras,.52,.22,.52,dark,-1.3,2.2,-.72);cyl(extras,.04,.04,.9,steel,-1.4,3.02,-.25,'y',10);
+const mg=cyl(extras,.07,.07,1.05,dark,-.15,3.05,0);mg.rotation.z=Math.PI/2;
+const selection=new THREE.BoxHelper(tank,0xb7f34a);selection.material.transparent=true;selection.material.opacity=.65;scene.add(selection);
+function setSelected(name){selected=name;document.querySelectorAll('.part').forEach(b=>b.classList.toggle('active',b.dataset.part===name));document.querySelector('#selectedName').textContent=({hull:'CASCO',turret:'TORRETA',barrel:'CANHÃO',tracks:'ESTEIRAS',armor:'BLINDAGEM EXTRA',extras:'ACESSÓRIOS'})[name];document.querySelector('#selectedHelp').textContent='Componente selecionado · ajuste nos controles';}
+document.querySelectorAll('.part').forEach(b=>b.onclick=()=>{setSelected(b.dataset.part);controls.target.copy(parts[selected].getWorldPosition(new THREE.Vector3()));});
+function update(){barrel.scale.x=+document.querySelector('#barrel').value/100;turret.scale.y=+document.querySelector('#turret').value/100;tracks.scale.z=+document.querySelector('#track').value/100;armor.visible=document.querySelector('#armorCheck').checked;extras.children.forEach((o,i)=>{o.visible=true});const w=document.querySelector('#weapon').value;mg.visible=w!=='none';if(w==='dual'){mg.visible=true;}document.querySelector('#smokeCheck').checked?extras.children.slice(0,6).forEach(o=>o.visible=true):extras.children.slice(0,6).forEach(o=>o.visible=false);extras.children[7].visible=document.querySelector('#antennaCheck').checked;document.querySelector('#barrelVal').textContent=document.querySelector('#barrel').value+'%';document.querySelector('#turretVal').textContent=document.querySelector('#turret').value+'%';document.querySelector('#trackVal').textContent=document.querySelector('#track').value+'%';selection.update();}
+['barrel','turret','track','weapon','armorCheck','smokeCheck','antennaCheck'].forEach(id=>document.querySelector('#'+id).addEventListener('input',update));
+document.querySelectorAll('.swatch').forEach(b=>b.onclick=()=>{mainColor=b.dataset.color;paint.color.set(mainColor);document.querySelectorAll('.swatch').forEach(x=>x.classList.toggle('active',x===b));});
+document.querySelector('#name').oninput=e=>{document.querySelector('#vehicleName').textContent=e.target.value.toUpperCase()+' · PROTÓTIPO'};
+document.querySelector('#base').onchange=e=>{if(e.target.value==='t90'){document.querySelector('#name').value='T-90';document.querySelector('#name').dispatchEvent(new Event('input'));document.querySelector('#barrel').value=90;document.querySelector('#turret').value=94;}else if(e.target.value==='abrams'){document.querySelector('#name').value='M1 Abrams';document.querySelector('#name').dispatchEvent(new Event('input'));document.querySelector('#barrel').value=100;document.querySelector('#turret').value=100;}update();};
+function config(){return {schema:'arena-verde-tank-v1',name:document.querySelector('#name').value,base:document.querySelector('#base').value,color:mainColor,barrel:+document.querySelector('#barrel').value,turret:+document.querySelector('#turret').value,track:+document.querySelector('#track').value,weapon:document.querySelector('#weapon').value,armor:document.querySelector('#armorCheck').checked,smoke:document.querySelector('#smokeCheck').checked,antenna:document.querySelector('#antennaCheck').checked,createdAt:new Date().toISOString()}}
+function apply(c){if(!c)return;document.querySelector('#name').value=c.name||'Tanque personalizado';document.querySelector('#name').dispatchEvent(new Event('input'));document.querySelector('#base').value=c.base||'custom';mainColor=c.color||mainColor;paint.color.set(mainColor);document.querySelectorAll('.swatch').forEach(b=>b.classList.toggle('active',b.dataset.color===mainColor));for(const id of ['barrel','turret','track','weapon'])if(c[id]!==undefined)document.querySelector('#'+id).value=c[id];for(const id of ['armor','smoke','antenna'])if(c[id]!==undefined)document.querySelector('#'+id+'Check').checked=c[id];update();}
+document.querySelector('#saveBtn').onclick=()=>{const c=config();localStorage.setItem('arenaVerdeTankDraft',JSON.stringify(c));document.querySelector('#status').textContent='Projeto salvo neste aparelho.';};
+document.querySelector('#exportBtn').onclick=async()=>{const c=config();const exporter=new GLTFExporter();try{const glb=await exporter.parseAsync(tank,{binary:true,onlyVisible:true});const blob=new Blob([glb],{type:'model/gltf-binary'});download(blob,(c.name||'tanque').toLowerCase().replace(/[^a-z0-9]+/g,'-')+'.glb');download(new Blob([JSON.stringify(c,null,2)],{type:'application/json'}),'config-tanque.json');document.querySelector('#status').textContent='Modelo GLB e configuração JSON exportados. Ainda não publicados no jogo.';}catch(e){document.querySelector('#status').textContent='Falha ao exportar: '+e.message;}};
+function download(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1500)}
+document.querySelector('#rotateBtn').onclick=()=>{auto=!auto;document.querySelector('#rotateBtn').classList.toggle('active',auto);};
+document.querySelector('#resetBtn').onclick=()=>{camera.position.set(8,6.3,9);controls.target.set(0,1,0);controls.update();};
+document.querySelector('#homeBtn').onclick=()=>location.href='/';
+const saved=localStorage.getItem('arenaVerdeTankDraft');if(saved){try{apply(JSON.parse(saved));document.querySelector('#status').textContent='Rascunho local carregado.'}catch{}}
+function resize(){const r=canvas.getBoundingClientRect();renderer.setSize(r.width,r.height,false);camera.aspect=r.width/r.height;camera.updateProjectionMatrix();}new ResizeObserver(resize).observe(canvas);resize();update();
+function animate(){requestAnimationFrame(animate);if(auto&&!controls.dragging)tank.rotation.y+=.0025;controls.update();selection.update();renderer.render(scene,camera);}animate();
+</script>
+</body></html>
