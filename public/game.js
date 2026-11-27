@@ -5757,7 +5757,7 @@
       f2 = T2 ? Math.max(0, T2.hp / st.max) : 0,
       nests = LV.objs.filter((o) => o.nest).length;
     ctx.fillStyle = "rgba(13,18,8,.62)";
-    ctx.fillRect(12, 12, 300, T2 ? 158 : mobileTouch ? 124 : 142);
+    ctx.fillRect(12, 12, 300, T2 ? 158 : mobileTouch ? 144 : 142);
     ctx.font = "12px 'Press Start 2P',monospace";
     ctx.fillStyle = "#f2c230";
     ctx.fillText(`MISSÃO ${camp.m + 1}: ${LV.M.n.toUpperCase()}`, 22, 32);
@@ -5807,7 +5807,7 @@
     ctx.fillStyle = "#000"; ctx.fillRect(180, 80, 120, 5); ctx.fillRect(180, 90, 120, 5);
     ctx.fillStyle = cf >= 1 ? "#8be04f" : "#f2c230"; ctx.fillRect(180, 80, 120 * Math.min(1, cf), 5);
     ctx.fillStyle = T.mgRest > 0 ? "#ff754f" : "#73d9ff"; ctx.fillRect(180, 90, 120 * Math.max(0, Math.min(1, mgRatio)), 5);
-    ctx.font = "7px Arial"; ctx.fillStyle = "#e6eed2"; ctx.fillText(T.mgRest > 0 ? `METRALHADORA · RECARGA ${T.mgRest.toFixed(1)}s` : `METRALHADORA · ${mgReady.toFixed(1)}s`, 180, 105);
+    ctx.font = "7px Arial"; ctx.fillStyle = "#e6eed2"; ctx.fillText(T.mgRest > 0 ? `METRALHADORA · RECARGA ${T.mgRest.toFixed(1)}s` : `METRALHADORA · ${mgReady.toFixed(1)}s`, 180, 135);
     // barra de progresso do mapa, com ninhos e extração
     const bw = Math.min(420, VWt * 0.36),
       bx = (VWt - bw) / 2,
