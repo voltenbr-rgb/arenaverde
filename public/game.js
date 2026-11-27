@@ -4520,23 +4520,27 @@
     a.ammo--;
     cooldown[k] = ACC[k].cd;
     if (k === "missile") {
-      // míssil leve: sobe em arco e desce no ponto marcado pela mira
-      const tg = player === 2
-          ? { x: tank.x + Math.cos(tank.tur) * aimDist, y: tank.y + Math.sin(tank.tur) * aimDist }
-          : aimPoint(),
-        dx = tg.x - tank.x,
-        dy = tg.y - tank.y,
-        ang = Math.atan2(dy, dx),
-        cfg = player === 2 ? tcfg2 : tcfg,
+      // Míssil leve em salva: cinco foguetes pequenos, espalhados em leque,
+      // com alcance máximo de cinco casas (CELL * 5).
+      const cfg = player === 2 ? tcfg2 : tcfg,
         R = CHASSIS[cfg.chassis].W * 0.37,
-        x0 = tank.x + Math.cos(ang) * (R + 10),
-        y0 = tank.y + Math.sin(ang) * (R + 10),
-        d = Math.hypot(tg.x - x0, tg.y - y0) || 1,
-        speed = 560;
-      tp.push({ k:"msl",x0,y0,x:x0,y:y0,tx:tg.x,ty:tg.y,h:16,t:0,T:0.7+d/420,vx:0,vy:0 });
-      const [a2,b2]=P(x0,y0,17);
-      for(let i=0;i<6;i++)G(GL.sl,a2,b2,{add:false,a:.5,smoke:1,vx:rnd(-14,14),vy:rnd(-4,10),r0:2,r1:rnd(6,11),life:rnd(.8,1.4),drag:1.5});
-      G(GL.o,a2,b2,{r0:4,r1:8,life:.12}); sfx("launch"); rumble(.3,80);
+        target = player === 2 ? null : aimPoint(),
+        baseAng = target ? Math.atan2(target.y - tank.y, target.x - tank.x) : tank.tur,
+        offsets = [-0.24, -0.12, 0, 0.12, 0.24],
+        range = CELL * 5;
+      for (const spread of offsets) {
+        const ang = baseAng + spread,
+          x0 = tank.x + Math.cos(ang) * (R + 10),
+          y0 = tank.y + Math.sin(ang) * (R + 10),
+          tx = tank.x + Math.cos(ang) * range,
+          ty = tank.y + Math.sin(ang) * range,
+          d = Math.hypot(tx - x0, ty - y0) || 1;
+        tp.push({ k:"msl",x0,y0,x:x0,y:y0,tx,ty,h:16,t:0,T:0.42+d/520,vx:0,vy:0,dmg:26,splash:18 });
+        const [a2,b2]=P(x0,y0,17);
+        for(let i=0;i<3;i++)G(GL.sl,a2,b2,{add:false,a:.5,smoke:1,vx:rnd(-14,14),vy:rnd(-4,10),r0:1.5,r1:rnd(4,8),life:rnd(.55,1),drag:1.5});
+        G(GL.o,a2,b2,{r0:3,r1:6,life:.1});
+      }
+      sfx("launch"); rumble(.3,80);
     } else if (k === "heavy") {
       const ang=tank.tur,dx=Math.cos(ang),dy=Math.sin(ang),cfg=player===2?tcfg2:tcfg,
         R=CHASSIS[cfg.chassis].W*.37,x0=tank.x+dx*(R+10),y0=tank.y+dy*(R+10),speed=430;
@@ -4626,7 +4630,7 @@
       if (f >= 1) {
         p.dead = true;
         if (p.k === "msl") {
-          boomAt(p.tx, p.ty, 130, 34, 2.1);
+          boomAt(p.tx, p.ty, p.dmg || 130, p.splash || 34, 2.1);
           rumble(0.5, 150);
         } else clouds.push({ x: p.tx, y: p.ty, r: 42, life: 7, t: 0 });
       }
@@ -5798,7 +5802,7 @@
     const release=()=>{tin[key]=false;b.classList.remove("on");};
     b.addEventListener("pointerup",release); b.addEventListener("pointercancel",release); b.addEventListener("lostpointercapture",release);
   };
-  [["mvUp","moveUp"],["mvDown","moveDown"],["mvLeft","moveLeft"],["mvRight","moveRight"],["aimLeft","aimLeft"],["aimRight","aimRight"],["tbSpec","spec"],["tbSmoke","smoke"]].forEach(([id,key])=>pressControl(id,key));
+  [["mvUp","moveUp"],["mvDown","moveDown"],["mvLeft","moveLeft"],["mvRight","moveRight"],["tbSpec","spec"],["tbSmoke","smoke"]].forEach(([id,key])=>pressControl(id,key));
   // Arrastar os grupos para personalizar a posição dos controles.
   document.querySelectorAll("[data-drag]").forEach(el=>{
     let drag=null;
@@ -5838,12 +5842,34 @@
   if(aimFire){let pid=null;aimFire.addEventListener("pointerdown",e=>{if(!mobileTouch||MODE!=="tank"||state!=="play"||pid!==null)return;e.preventDefault();audio();pid=e.pointerId;aimFire.setPointerCapture(pid);tin.cannon=true;aimFire.classList.add("on");});
     const up=e=>{if(e.pointerId!==pid)return;pid=null;tin.cannon=false;aimFire.classList.remove("on");};["pointerup","pointercancel","lostpointercapture"].forEach(n=>aimFire.addEventListener(n,up));
   }
-  // Setas dedicadas: rotação contínua e multitouch independente por pointerId.
-  [["tbTurretLeft","aimLeft"],["tbTurretRight","aimRight"]].forEach(([id,key])=>{
-    const button=$(id); if(!button)return; const active=new Set();
-    button.addEventListener("pointerdown",e=>{if(!mobileTouch||MODE!=="tank"||state!=="play")return;e.preventDefault();audio();active.add(e.pointerId);button.setPointerCapture(e.pointerId);tin[key]=true;button.classList.add("on");});
-    const release=e=>{if(!active.has(e.pointerId))return;active.delete(e.pointerId);tin[key]=active.size>0;button.classList.toggle("on",tin[key]);};
-    ["pointerup","pointercancel","lostpointercapture"].forEach(n=>button.addEventListener(n,release));
+  // Área de toque horizontal: arrastar para os lados gira a torreta apenas enquanto o dedo está pressionado.
+  const turretPad=$("aimPad");
+  if(turretPad){
+    let pointer=null,lastX=0;
+    turretPad.addEventListener("pointerdown",e=>{
+      if(!mobileTouch||MODE!=="tank"||state!=="play"||pointer!==null)return;
+      e.preventDefault();audio();pointer=e.pointerId;lastX=e.clientX;
+      try{turretPad.setPointerCapture(pointer)}catch(err){}
+      turretPad.classList.add("active");
+    });
+    turretPad.addEventListener("pointermove",e=>{
+      if(e.pointerId!==pointer||!T)return;
+      e.preventDefault();
+      const dx=e.clientX-lastX;lastX=e.clientX;
+      const sens=(mobileCfg.sensitivity||100)/100;
+      T.tur+=dx*0.012*sens;
+    });
+    const release=e=>{
+      if(e.pointerId!==pointer)return;
+      pointer=null;turretPad.classList.remove("active");
+    };
+    ["pointerup","pointercancel","lostpointercapture"].forEach(n=>turretPad.addEventListener(n,release));
+  }
+  const centerTurret=$("tbTurretCenter");
+  if(centerTurret)centerTurret.addEventListener("click",()=>{
+    if(!mobileTouch||MODE!=="tank"||state!=="play"||!T)return;
+    audio();T.tur=T.ang;centerTurret.classList.add("on");
+    setTimeout(()=>centerTurret.classList.remove("on"),120);
   });
   const mgButton=$("tbMG");
   if(mgButton){let pid=null;mgButton.addEventListener("pointerdown",e=>{if(!mobileTouch||MODE!=="tank"||state!=="play")return;e.preventDefault();audio();pid=e.pointerId;mgButton.setPointerCapture(pid);tin.mg=true;mgButton.classList.add("on");});const up=e=>{if(e.pointerId!==pid)return;pid=null;tin.mg=false;mgButton.classList.remove("on");};["pointerup","pointercancel","lostpointercapture"].forEach(n=>mgButton.addEventListener(n,up));}
