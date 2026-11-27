@@ -3346,7 +3346,7 @@
     { k: "armor", n: "Blindagem", desc: "+20% de vida máxima" },
     { k: "dmg", n: "Munição perfurante", desc: "+20% de dano do canhão" },
     { k: "reload", n: "Carregador automático", desc: "-15% no tempo de recarga" },
-    { k: "mg", n: "Metralhadora .50", desc: "+30% de dano e esquenta menos" },
+    { k: "mg", n: "Metralhadora .50", desc: "+30% de dano e +5s de ciclo ativo" },
     { k: "engine", n: "Motor turbo", desc: "+12% de velocidade" },
   ];
   const UPG_COST = [80, 140, 220];
@@ -3403,6 +3403,7 @@
       reload: cn.reload * Math.pow(0.85, lv.reload || 0),
       mgDmg: 9 * (1 + 0.3 * (lv.mg || 0)),
       mgHeat: 0.045 * (1 - 0.15 * (lv.mg || 0)),
+      mgDuration: 20 + 5 * (lv.mg || 0),
     };
   };
 
@@ -4007,17 +4008,13 @@
   function saveCamp() {
     store.set("tankCamp", camp);
   }
-  function goFullscreen() {
-    try {
-      const el = document.documentElement;
-      if (!document.fullscreenElement && el.requestFullscreen && matchMedia("(pointer: coarse)").matches)
-        el.requestFullscreen({ navigationUI: "hide" })
-          .then(
-            () => screen.orientation && screen.orientation.lock && screen.orientation.lock("landscape").catch(() => {}),
-          )
-          .catch(() => {});
-    } catch (e) {}
+  function requestLandscape() {
+    if (!matchMedia("(pointer: coarse)").matches) return;
+    const lock = () => { try { const p = screen.orientation?.lock?.("landscape"); if (p && p.catch) p.catch(() => {}); } catch (e) {} };
+    lock();
+    try { const el = document.documentElement; if (!document.fullscreenElement && el.requestFullscreen) { const p = el.requestFullscreen({ navigationUI: "hide" }); if (p && p.then) p.then(lock).catch(() => {}); } } catch (e) {}
   }
+  function goFullscreen() { requestLandscape(); }
   function tStart() {
     MODE = "tank";
     // Cada missão tem sua própria sequência de rádio; as comunicações voltam na fase seguinte.
@@ -4046,6 +4043,8 @@
       hp: st.max,
       cd: 0.5,
       mgCd: 0,
+      mgTimeLeft: st.mgDuration,
+      mgRest: 0,
       heat: 0,
       over: false,
       rec: 0,
@@ -4053,7 +4052,7 @@
       fl: 0,
     };
     mobileLastHullAngle = T.ang;
-    T2 = tankPlayers === 2 ? { x: T.x, y: T.y + 58, ang: 0, tur: 0, vel: 0, hp: Math.round(CHASSIS[tcfg2.chassis].hp * (1 + 0.2 * (lv.armor || 0))), cd: 0.8, mgCd: 0, phase: 0, fl: 0 } : null;
+    T2 = tankPlayers === 2 ? { x: T.x, y: T.y + 58, ang: 0, tur: 0, vel: 0, hp: Math.round(CHASSIS[tcfg2.chassis].hp * (1 + 0.2 * (lv.armor || 0))), cd: 0.8, mgCd: 0, mgTimeLeft: st.mgDuration, mgRest: 0, phase: 0, fl: 0 } : null;
     tz = [];
     tp = [];
     zp = [];
@@ -4065,8 +4064,8 @@
     if (!acc[specSel] || !acc[specSel].own) specSel = SPECIALS.find((k) => acc[k].own) || "missile";
     tmines = [];
     clouds = [];
-    accCd = { missile: 0, heavy: 0, mine: 0, smoke: 0 };
-    accCd2 = { missile: 0, heavy: 0, mine: 0, smoke: 0 };
+    accCd = { missile: 0, heavy: 0, mortar: 0, flame: 0, shock: 0, mine: 0, smoke: 0 };
+    accCd2 = { missile: 0, heavy: 0, mortar: 0, flame: 0, shock: 0, mine: 0, smoke: 0 };
     specSel2 = specSel;
     kills = 0;
     state = "play";
@@ -4155,6 +4154,7 @@
       .join("")}</div></div>`;
   }
   function showTankPlayers() {
+    requestLandscape();
     state="tplayers";
     showOv(`<h2 class="title">MODO TANK</h2><p class="sub">Quantos jogadores vão entrar na missão?</p><button class="big" data-a="tplayers" data-n="1">1 JOGADOR</button><button class="big" data-a="tplayers" data-n="2">2 JOGADORES · COOPERATIVO LOCAL</button><button class="alt" data-a="menu">VOLTAR</button>`);
   }
@@ -4474,11 +4474,6 @@
       oy = T.y + Math.sin(T.ang) * -2 + Math.sin(side) * R * 0.5 + Math.sin(T.tur) * 11;
     tp.push({ k: "mg", x: ox, y: oy, h: 12, vx: Math.cos(a) * 560, vy: Math.sin(a) * 560, life: 0.5, dmg: st.mgDmg });
     T.mgCd = 0.085;
-    T.heat += st.mgHeat;
-    if (T.heat >= 1) {
-      T.over = true;
-      txt(...P(T.x, T.y, 30), "SUPERAQUECEU!", "255,120,80");
-    }
     const [fx0, fy0] = P(ox, oy, 12);
     G(GL.y, fx0, fy0, { r0: 1.8, r1: 3, life: 0.05 });
     part(fx0, fy0, rnd(-20, 20), -rnd(30, 50), 0.6, "#d9a440", 1, 260);
@@ -4489,7 +4484,10 @@
      L1 / E = acessório especial selecionado (mísseis ou minas) · ←/→ do controle, Tab ou roda do mouse trocam
      L2 / Q = lança-fumaça. Compre na Oficina ou ache nas caixas azuis do mapa. */
   const ACC = {
-    missile: { n:"Míssil leve", desc:"Sobe e cai no ponto marcado pela mira", unlock:150, pack:4, packCost:90, max:12, cd:1.1 },
+    missile: { n:"Míssil leve", desc:"Salva de foguetes guiada pela direção da mira", unlock:150, pack:4, packCost:90, max:12, cd:1.1 },
+    mortar: { n:"Morteiro explosivo", desc:"Projétil em arco com explosão de fragmentação em área", unlock:180, pack:3, packCost:95, max:9, cd:2.0 },
+    flame: { n:"Lança-chamas", desc:"Rajada incendiária de curto alcance em leque", unlock:160, pack:4, packCost:85, max:12, cd:1.25 },
+    shock: { n:"Pulso de choque", desc:"Onda sônica ao redor do tanque que fere e paralisa zumbis", unlock:210, pack:2, packCost:110, max:6, cd:3.0 },
     heavy: { n:"Míssil pesado", desc:"Projétil raro de trajetória reta e explosão poderosa", unlock:0, pack:0, packCost:0, max:4, cd:2.2 },
     mine: { n: "Minas", desc: "Solta uma mina atrás do tanque", unlock: 120, pack: 3, packCost: 70, max: 9, cd: 0.7 },
     smoke: {
@@ -4502,19 +4500,22 @@
       cd: 2.5,
     },
   };
-  const SPECIALS = ["missile", "heavy", "mine"];
+  const SPECIALS = ["missile", "heavy", "mortar", "flame", "shock", "mine"];
   const accDefault = () => ({
     missile: { own: false, ammo: 0 },
     heavy: { own: false, ammo: 0 },
+    mortar: { own: false, ammo: 0 },
+    flame: { own: false, ammo: 0 },
+    shock: { own: false, ammo: 0 },
     mine: { own: false, ammo: 0 },
     smoke: { own: false, ammo: 0 },
   });
-  const cloneAcc = (a) => JSON.parse(JSON.stringify(a || accDefault()));
+  const cloneAcc = (a) => Object.assign(accDefault(), JSON.parse(JSON.stringify(a || {})));
   let acc = accDefault(),
     specSel = "missile",
     specSel2 = "missile",
-    accCd = { missile: 0, heavy: 0, mine: 0, smoke: 0 },
-    accCd2 = { missile: 0, heavy: 0, mine: 0, smoke: 0 },
+    accCd = { missile: 0, heavy: 0, mortar: 0, flame: 0, shock: 0, mine: 0, smoke: 0 },
+    accCd2 = { missile: 0, heavy: 0, mortar: 0, flame: 0, shock: 0, mine: 0, smoke: 0 },
     tmines = [],
     clouds = [],
     aimDist = 170;
@@ -4554,7 +4555,20 @@
     }
     a.ammo--;
     cooldown[k] = ACC[k].cd;
-    if (k === "missile") {
+    if (k === "mortar") {
+      const target = player === 2 ? { x: tank.x + Math.cos(tank.tur) * 150, y: tank.y + Math.sin(tank.tur) * 150 } : aimPoint();
+      tp.push({ k: "mrt", x0: tank.x, y0: tank.y, x: tank.x, y: tank.y, tx: target.x, ty: target.y, t: 0, T: 0.9, h: 8, dmg: 125, splash: 68 });
+      const [fx, fy] = P(tank.x, tank.y, 12); G(GL.y, fx, fy, { r0: 4, r1: 9, life: .16 });
+      sfx("launch"); rumble(.3, 90);
+    } else if (k === "flame") {
+      for (const spread of [-.16, 0, .16]) { const a = tank.tur + spread, x = tank.x + Math.cos(a) * 18, y = tank.y + Math.sin(a) * 18; tp.push({ k: "flame", x, y, h: 9, vx: Math.cos(a) * 190, vy: Math.sin(a) * 190, life: .72, dmg: 34 }); }
+      sfx("throw"); rumble(.2, 70);
+    } else if (k === "shock") {
+      const radius = 112;
+      for (const z of tz) if (!z.dead && Math.hypot(z.x - tank.x, z.y - tank.y) <= radius + z.r) { tHurt(z, 82); z.stun = Math.max(z.stun || 0, 1.8); }
+      for (const o of LV.objs) if (!o.dead && Math.hypot(o.x - tank.x, o.y - tank.y) <= radius + o.r) hitObj(o, 48);
+      const [fx, fy] = P(tank.x, tank.y, 4); boom(fx, fy, 1.65); rumble(.7, 180); sfx("hit");
+    } else if (k === "missile") {
       // Míssil leve em salva: cinco foguetes pequenos, espalhados em leque,
       // com alcance máximo de cinco casas (CELL * 5).
       const cfg = player === 2 ? tcfg2 : tcfg,
@@ -4642,7 +4656,8 @@
       if (SPECIALS.includes(k)) specSel = k;
       banner(`NOVO ACESSÓRIO: ${ACC[k].n.toUpperCase()}! (${k === "smoke" ? "L2 / Q" : "L1 / E"})`, 2.6);
     } else {
-      k = Object.keys(ACC).filter((k) => k !== "heavy")[(Math.random() * 3) | 0];
+      const available = Object.keys(ACC).filter((key) => key !== "heavy");
+      k = available[(Math.random() * available.length) | 0];
       acc[k].ammo = Math.min(ACC[k].max, acc[k].ammo + ACC[k].pack);
       banner(`+${ACC[k].pack} ${ACC[k].n.toUpperCase()}`, 1.6);
     }
@@ -4651,6 +4666,7 @@
   function accUpdate(dt) {
     for (const k in accCd) { accCd[k] = Math.max(0, accCd[k] - dt); accCd2[k] = Math.max(0, accCd2[k] - dt); }
     for (const p of tp) {
+      if (p.k === "mrt") { p.t += dt; const f = Math.min(1, p.t / p.T); p.x = p.x0 + (p.tx - p.x0) * f; p.y = p.y0 + (p.ty - p.y0) * f; p.h = 8 + Math.sin(Math.PI * f) * 58; if (f >= 1) { p.dead = true; boomAt(p.tx, p.ty, p.dmg, p.splash, 2.35); const [sx, sy] = P(p.tx, p.ty, 5); for (let i = 0; i < 18; i++) { const a = rnd(0, 6.28), v = rnd(35, 135); part(sx, sy, Math.cos(a) * v, Math.sin(a) * v, .45, "#d8c07a", 1, 70); } rumble(.65, 180); } continue; }
       if (p.k !== "msl" && p.k !== "smk") continue;
       p.t += dt;
       const f = Math.min(1, p.t / p.T),
@@ -4804,7 +4820,7 @@
     const st = tStats();
     // COOPERATIVO LOCAL: o segundo controle pilota um segundo tanque independente.
     if (T2 && state === "play") {
-      const st2={max:Math.round(CHASSIS[tcfg2.chassis].hp*(1+0.2*(lv.armor||0))),speed:CHASSIS[tcfg2.chassis].speed*(1+0.12*(lv.engine||0)),turn:CHASSIS[tcfg2.chassis].turn,dmg:CANNON[tcfg2.cannon].dmg*(1+0.2*(lv.dmg||0)),reload:CANNON[tcfg2.cannon].reload*Math.pow(0.85,lv.reload||0),mgDmg:9*(1+0.3*(lv.mg||0))};
+      const st2={max:Math.round(CHASSIS[tcfg2.chassis].hp*(1+0.2*(lv.armor||0))),speed:CHASSIS[tcfg2.chassis].speed*(1+0.12*(lv.engine||0)),turn:CHASSIS[tcfg2.chassis].turn,dmg:CANNON[tcfg2.cannon].dmg*(1+0.2*(lv.dmg||0)),reload:CANNON[tcfg2.cannon].reload*Math.pow(0.85,lv.reload||0),mgDmg:9*(1+0.3*(lv.mg||0)),mgDuration:20+5*(lv.mg||0)};
       const f2=-pad2.ly, r2=pad2.lx; T2.ang+=(Math.abs(r2)>.18?r2:0)*st2.turn*dt;
       const v2=(Math.abs(f2)>.18?f2:0)*st2.speed*(f2<0?.6:1); T2.vel+=(v2-T2.vel)*Math.min(1,dt*5);
       const nx2=T2.x+Math.cos(T2.ang)*T2.vel*dt, ny2=T2.y+Math.sin(T2.ang)*T2.vel*dt;
@@ -4813,7 +4829,12 @@
       if(Math.hypot(pad2.rx,pad2.ry)>.28)T2.tur=turnTo(T2.tur,screenToGroundDir(pad2.rx,pad2.ry),4.5*dt);
       T2.cd-=dt;T2.mgCd-=dt;T2.fl=Math.max(0,T2.fl-dt); const c2=CANNON[tcfg2.cannon];
       if(pad2.cannon&&T2.cd<=0){const dx2=Math.cos(T2.tur),dy2=Math.sin(T2.tur),xx=T2.x+dx2*(c2.len+18),yy=T2.y+dy2*(c2.len+18);tp.push({k:"shell",x:xx,y:yy,h:9.8,vx:dx2*c2.speed,vy:dy2*c2.speed,life:c2.range/c2.speed,dmg:st2.dmg,splash:c2.splash,bk:c2.k,owner:2});T2.cd=st2.reload;sfx("cannon");}
-      if(pad2.mg&&T2.mgCd<=0){const a2=T2.tur+(Math.random()-.5)*.08;tp.push({k:"mg",x:T2.x+Math.cos(a2)*15,y:T2.y+Math.sin(a2)*15,h:12,vx:Math.cos(a2)*560,vy:Math.sin(a2)*560,life:.5,dmg:st2.mgDmg,owner:2});T2.mgCd=.085;}
+      T2.mgRest = Math.max(0, (T2.mgRest || 0) - dt);
+      if (T2.mgRest <= 0 && (T2.mgTimeLeft || 0) <= 0) T2.mgTimeLeft = st2.mgDuration;
+      if (pad2.mg && T2.mgRest <= 0 && T2.mgTimeLeft > 0) {
+        if (T2.mgCd <= 0) { const a2=T2.tur+(Math.random()-.5)*.08; tp.push({k:"mg",x:T2.x+Math.cos(a2)*15,y:T2.y+Math.sin(a2)*15,h:12,vx:Math.cos(a2)*560,vy:Math.sin(a2)*560,life:.5,dmg:st2.mgDmg,owner:2}); T2.mgCd=.085; }
+        T2.mgTimeLeft = Math.max(0, T2.mgTimeLeft - dt); if (T2.mgTimeLeft <= 0) T2.mgRest = 10;
+      }
       if(pad2.spec) useAcc(specSel2,T2,2);
       if(pad2.smoke) useAcc("smoke",T2,2);
     }
@@ -4871,26 +4892,33 @@
       engine.o.frequency.setTargetAtTime(36 + 34 * f, AC.currentTime, 0.1);
     }
     // --- torreta: mobile = setas dedicadas; desktop = cursor do mouse/controle
-    const turretTurn = (tin.aimRight ? 1 : 0) - (tin.aimLeft ? 1 : 0);
+    const turretTurn = (tin.aimRight ? 1 : 0) - (tin.aimLeft ? 1 : 0) + (tkeys.has("arrowright") ? 1 : 0) - (tkeys.has("arrowleft") ? 1 : 0);
     if (mobileTouch) {
-      if (turretTurn) T.tur += turretTurn * 2.0 * sens * dt;
+      if (turretTurn) { T.centering = false; T.tur += turretTurn * 2.0 * sens * dt; }
       // Sem mira automática por toque ou movimento: mantém o ângulo relativo ao chassi.
+    } else if (turretTurn) {
+      T.centering = false; T.tur += turretTurn * 2.0 * dt;
     } else if (Math.hypot(pad.rx,pad.ry) > .3) {
-      T.tur = turnTo(T.tur,screenToGroundDir(pad.rx,pad.ry),4.5*dt);
+      T.centering = false; T.tur = turnTo(T.tur,screenToGroundDir(pad.rx,pad.ry),4.5*dt);
     } else if (tin.mouse) {
-      T.tur = turnTo(T.tur,Math.atan2(tin.mouse.y-T.y,tin.mouse.x-T.x),4*dt);
+      T.centering = false; T.tur = turnTo(T.tur,Math.atan2(tin.mouse.y-T.y,tin.mouse.x-T.x),4*dt);
     }
+    if (T.centering) { T.tur = turnTo(T.tur, T.ang, 2.6 * dt); if (Math.abs(angDiff(T.ang, T.tur)) < 0.012) { T.tur = T.ang; T.centering = false; } }
     // --- armas
     T.cd -= dt;
     T.mgCd -= dt;
+    T.mgRest = Math.max(0, (T.mgRest || 0) - dt);
+    if (T.mgRest <= 0 && (T.mgTimeLeft || 0) <= 0) T.mgTimeLeft = st.mgDuration;
     T.rec = Math.max(0, T.rec - dt);
     T.fl = Math.max(0, T.fl - dt);
     const wantCannon = tin.cannon || pad.cannon || tkeys.has(" "),
       wantMG = tin.mg || pad.mg || tkeys.has("shift");
     if (wantCannon && T.cd <= 0) fireCannon(st);
-    if (wantMG && !T.over && T.mgCd <= 0) fireMG(st);
-    T.heat = Math.max(0, T.heat - dt * (wantMG && !T.over ? 0.05 : 0.38));
-    if (T.over && T.heat < 0.3) T.over = false;
+    if (wantMG && T.mgRest <= 0 && T.mgTimeLeft > 0) {
+      if (T.mgCd <= 0) fireMG(st);
+      T.mgTimeLeft = Math.max(0, T.mgTimeLeft - dt);
+      if (T.mgTimeLeft <= 0) { T.mgRest = 10; banner("METRALHADORA EM RECARGA · 10s", 1.2); }
+    }
     if (tin.spec || pad.spec || tkeys.has("e")) useAcc(specSel,T,1);
     if (tin.smoke || pad.smoke || tkeys.has("q")) useAcc("smoke",T,1);
     accUpdate(dt);
@@ -4927,8 +4955,9 @@
       z.t += dt;
       z.fl = Math.max(0, z.fl - dt);
       z.firing = Math.max(0, z.firing - dt);
-      const d = z.d,
-        targetTank = T2 && T2.hp>0 && Math.hypot(T2.x-z.x,T2.y-z.y)<Math.hypot(T.x-z.x,T.y-z.y) ? T2 : T,
+      const d = z.d;
+      if (z.stun > 0) { z.stun = Math.max(0, z.stun - dt); z.bite = false; continue; }
+      const targetTank = T2 && T2.hp>0 && Math.hypot(T2.x-z.x,T2.y-z.y)<Math.hypot(T.x-z.x,T.y-z.y) ? T2 : T,
         dx = targetTank.x - z.x,
         dy = targetTank.y - z.y,
         dist = Math.hypot(dx, dy),
@@ -5046,7 +5075,7 @@
     }
     // --- projéteis do tanque
     for (const p of tp) {
-      if (p.k === "msl" || p.k === "smk") continue; // tratados em accUpdate
+      if (p.k === "msl" || p.k === "smk" || p.k === "mrt") continue; // tratados em accUpdate
       if(p.k==="hmsl"){
         p.life-=dt;p.x+=p.vx*dt;p.y+=p.vy*dt;const [fx,fy]=P(p.x,p.y,p.h),ang=p.ang;
         for(let j=0;j<3;j++){const [tx,ty]=P(p.x-Math.cos(ang)*rnd(2,12),p.y-Math.sin(ang)*rnd(2,12),p.h);G(GL.y,tx,ty,{r0:rnd(3,6),r1:rnd(7,13),life:rnd(.15,.28),a:.95});G(GL.o,tx,ty,{r0:2,r1:4,life:.12,a:.9});}
@@ -5058,6 +5087,7 @@
       p.life -= dt;
       p.x += p.vx * dt;
       p.y += p.vy * dt;
+      if (p.k === "flame") { const [fx, fy] = P(p.x, p.y, p.h); G(GL.o, fx, fy, { r0: 2, r1: 7, life: .12, a: .8 }); if (Math.random() < .7) G(GL.sl, fx, fy, { add: false, a: .45, smoke: 1, r0: 2, r1: 5, life: .28 }); }
       if (p.k === "shell" && Math.random() < 0.7) {
         const [a, b] = P(p.x, p.y, p.h);
         G(GL.sl, a, b, { add: false, a: 0.22, smoke: 1, r0: 0.8, r1: 2.6, life: 0.45 });
@@ -5727,7 +5757,7 @@
       f2 = T2 ? Math.max(0, T2.hp / st.max) : 0,
       nests = LV.objs.filter((o) => o.nest).length;
     ctx.fillStyle = "rgba(13,18,8,.62)";
-    ctx.fillRect(12, 12, mobileTouch ? 300 : 300, mobileTouch && !T2 ? 124 : 142);
+    ctx.fillRect(12, 12, 300, T2 ? 158 : mobileTouch ? 144 : 142);
     ctx.font = "12px 'Press Start 2P',monospace";
     ctx.fillStyle = "#f2c230";
     ctx.fillText(`MISSÃO ${camp.m + 1}: ${LV.M.n.toUpperCase()}`, 22, 32);
@@ -5749,6 +5779,7 @@
       ctx.fillStyle = f2 > .5 ? "#59b9ff" : f2 > .25 ? "#f2c230" : "#e0533a";
       ctx.fillRect(22, 76, 190 * f2, 7);
       ctx.fillStyle = "#e6eed2"; ctx.fillText(`P2 ${T2 ? Math.ceil(f2 * 100) : "--"}%`, 220, 84);
+      if (T2) { ctx.font = "7px Arial"; ctx.fillStyle = T2.mgRest > 0 ? "#ff9678" : "#9edfff"; ctx.fillText(T2.mgRest > 0 ? `P2 METRALHADORA · RECARGA ${T2.mgRest.toFixed(1)}s` : `P2 METRALHADORA · ${(T2.mgTimeLeft || 0).toFixed(1)}s`, 180, 145); }
     }
     ctx.fillStyle = "#f2c230";
     ctx.fillText(`${money}  ★${score}`, 22, 102);
@@ -5765,20 +5796,18 @@
             ? "#c8d0c0"
             : "#ff8a5a"
           : "rgba(230,238,210,.55)";
-      const label = `${k === "missile" ? "LEVE" : k === "heavy" ? "PESADO" : k === "mine" ? "MINA" : "FUMAÇA"} ${a.own ? a.ammo : "-"}`;
+      const label = `${k === "missile" ? "LEVE" : k === "heavy" ? "PESADO" : k === "mortar" ? "MORTEIRO" : k === "flame" ? "FOGO" : k === "shock" ? "PULSO" : k === "mine" ? "MINA" : "FUMAÇA"} ${a.own ? a.ammo : "-"}`;
       ctx.fillText(label, ax0, 116);
       if (on && a.own && k !== "smoke") ctx.fillRect(ax0, 120, ctx.measureText(label).width, 2);
       ax0 += ctx.measureText(label).width + 14;
     }
     // canhão / metralhadora
     const cf = 1 - Math.max(0, T.cd) / st.reload;
-    ctx.fillStyle = "#000";
-    ctx.fillRect(180, 80, 120, 5);
-    ctx.fillRect(180, 90, 120, 5);
-    ctx.fillStyle = cf >= 1 ? "#8be04f" : "#f2c230";
-    ctx.fillRect(180, 80, 120 * Math.min(1, cf), 5);
-    ctx.fillStyle = T.over ? "#ff5a2a" : T.heat > 0.7 ? "#ff9a3a" : "#e6eed2";
-    ctx.fillRect(180, 90, 120 * T.heat, 5);
+    const mgReady = Math.max(0, T.mgTimeLeft || 0), mgRatio = T.mgRest > 0 ? 1 - T.mgRest / 10 : mgReady / st.mgDuration;
+    ctx.fillStyle = "#000"; ctx.fillRect(180, 80, 120, 5); ctx.fillRect(180, 90, 120, 5);
+    ctx.fillStyle = cf >= 1 ? "#8be04f" : "#f2c230"; ctx.fillRect(180, 80, 120 * Math.min(1, cf), 5);
+    ctx.fillStyle = T.mgRest > 0 ? "#ff754f" : "#73d9ff"; ctx.fillRect(180, 90, 120 * Math.max(0, Math.min(1, mgRatio)), 5);
+    ctx.font = "7px Arial"; ctx.fillStyle = "#e6eed2"; ctx.fillText(T.mgRest > 0 ? `METRALHADORA · RECARGA ${T.mgRest.toFixed(1)}s` : `METRALHADORA · ${mgReady.toFixed(1)}s`, 180, 135);
     // barra de progresso do mapa, com ninhos e extração
     const bw = Math.min(420, VWt * 0.36),
       bx = (VWt - bw) / 2,
@@ -5804,6 +5833,8 @@
       fl = mobileTouch ? `☁ FUMAÇA x${acc.smoke.ammo}` : `FUMAÇA · Q / L2 ${acc.smoke.own ? "x" + acc.smoke.ammo : ""}`;
     if ($("tbSpec").textContent !== sl) $("tbSpec").textContent = sl;
     if ($("tbSmoke").textContent !== fl) $("tbSmoke").textContent = fl;
+    const mgSmall = $("tbMG")?.querySelector("small");
+    if (mgSmall) mgSmall.textContent = T.mgRest > 0 ? `RECARGA ${T.mgRest.toFixed(0)}s` : `${tin.mg || pad.mg || tkeys.has("shift") ? "DISPARO" : "PRONTO"} ${T.mgTimeLeft.toFixed(0)}s`;
     const boss = tz.find((z) => z.d.big && !z.dead);
     if (boss) $("bossfill").style.width = Math.max(0, (boss.hp / boss.max) * 100) + "%";
     else if (!$("bossbar").hidden) $("bossbar").hidden = true;
@@ -5826,6 +5857,7 @@
     "e",
     "q",
     "tab",
+    "c",
   ]);
   function tKey(e, down) {
     const k = e.key.toLowerCase();
@@ -5833,6 +5865,7 @@
     e.preventDefault();
     if (down) {
       if (k === "tab" && !e.repeat) cycleSpec(1);
+      if (k === "c" && !e.repeat && T) { T.centering = true; tin.mouse = null; }
       tkeys.add(k);
       tin.touch = false;
       if (k.startsWith("arrow")) tin.mouse = null;
@@ -5899,7 +5932,7 @@
   $("tbSwap").addEventListener("click", () => {
     audio();
     if (mobileTouch) {
-      const ammoTypes = ["missile", "heavy"].filter(k => acc[k].own);
+      const ammoTypes = SPECIALS.filter(k => acc[k].own);
       if (!ammoTypes.length) { banner("NENHUM MÍSSIL DISPONÍVEL", 1.5); return; }
       const i = ammoTypes.indexOf(specSel);
       specSel = ammoTypes[(i + 1 + ammoTypes.length) % ammoTypes.length];
@@ -5945,7 +5978,7 @@
   const centerTurret=$("tbTurretCenter");
   if(centerTurret)centerTurret.addEventListener("click",()=>{
     if(!mobileTouch||MODE!=="tank"||state!=="play"||!T)return;
-    audio();T.tur=T.ang;centerTurret.classList.add("on");
+    audio();T.centering=true;tin.mouse=null;centerTurret.classList.add("on");
     setTimeout(()=>centerTurret.classList.remove("on"),120);
   });
   const mgButton=$("tbMG");
