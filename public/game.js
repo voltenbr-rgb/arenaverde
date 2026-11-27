@@ -4666,7 +4666,7 @@
   function accUpdate(dt) {
     for (const k in accCd) { accCd[k] = Math.max(0, accCd[k] - dt); accCd2[k] = Math.max(0, accCd2[k] - dt); }
     for (const p of tp) {
-      if (p.k === "mrt") { p.t += dt; const f = Math.min(1, p.t / p.T); p.x = p.x0 + (p.tx - p.x0) * f; p.y = p.y0 + (p.ty - p.y0) * f; p.h = 8 + Math.sin(Math.PI * f) * 58; if (f >= 1) { p.dead = true; boomAt(p.tx, p.ty, p.dmg, p.splash, 2.35); rumble(.65, 180); } continue; }
+      if (p.k === "mrt") { p.t += dt; const f = Math.min(1, p.t / p.T); p.x = p.x0 + (p.tx - p.x0) * f; p.y = p.y0 + (p.ty - p.y0) * f; p.h = 8 + Math.sin(Math.PI * f) * 58; if (f >= 1) { p.dead = true; boomAt(p.tx, p.ty, p.dmg, p.splash, 2.35); const [sx, sy] = P(p.tx, p.ty, 5); for (let i = 0; i < 18; i++) { const a = rnd(0, 6.28), v = rnd(35, 135); part(sx, sy, Math.cos(a) * v, Math.sin(a) * v, .45, "#d8c07a", 1, 70); } rumble(.65, 180); } continue; }
       if (p.k !== "msl" && p.k !== "smk") continue;
       p.t += dt;
       const f = Math.min(1, p.t / p.T),
@@ -5757,7 +5757,7 @@
       f2 = T2 ? Math.max(0, T2.hp / st.max) : 0,
       nests = LV.objs.filter((o) => o.nest).length;
     ctx.fillStyle = "rgba(13,18,8,.62)";
-    ctx.fillRect(12, 12, mobileTouch ? 300 : 300, mobileTouch && !T2 ? 124 : 142);
+    ctx.fillRect(12, 12, 300, T2 ? 158 : mobileTouch ? 124 : 142);
     ctx.font = "12px 'Press Start 2P',monospace";
     ctx.fillStyle = "#f2c230";
     ctx.fillText(`MISSÃO ${camp.m + 1}: ${LV.M.n.toUpperCase()}`, 22, 32);
@@ -5779,6 +5779,7 @@
       ctx.fillStyle = f2 > .5 ? "#59b9ff" : f2 > .25 ? "#f2c230" : "#e0533a";
       ctx.fillRect(22, 76, 190 * f2, 7);
       ctx.fillStyle = "#e6eed2"; ctx.fillText(`P2 ${T2 ? Math.ceil(f2 * 100) : "--"}%`, 220, 84);
+      if (T2) { ctx.font = "7px Arial"; ctx.fillStyle = T2.mgRest > 0 ? "#ff9678" : "#9edfff"; ctx.fillText(T2.mgRest > 0 ? `P2 METRALHADORA · RECARGA ${T2.mgRest.toFixed(1)}s` : `P2 METRALHADORA · ${(T2.mgTimeLeft || 0).toFixed(1)}s`, 180, 145); }
     }
     ctx.fillStyle = "#f2c230";
     ctx.fillText(`${money}  ★${score}`, 22, 102);
