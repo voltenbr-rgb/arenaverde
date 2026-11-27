@@ -1,6 +1,8 @@
 /* Arena Verde — lógica do jogo (canvas + Web Audio, sem frameworks) */
 {
   const $ = (id) => document.getElementById(id);
+  const mobileTouch = new URLSearchParams(location.search).get("mobile") === "1" || (matchMedia("(pointer: coarse)").matches && matchMedia("(max-width: 1100px)").matches);
+  document.documentElement.classList.toggle("mobile-controls", mobileTouch);
   const cv = $("cv"),
     ctx = cv.getContext("2d");
   const COLS = 9,
@@ -3334,7 +3336,7 @@
   let tankPlayers = 1, tankSetupPlayer = 1;
   let tcfg2 = Object.assign({ camo: "verde", cannon: "padrao", chassis: "medio" }, store.get("tank2") || {});
   const tkeys = new Set();
-  const tin = { joy: null, joy2: null, cannon: false, mg: false, spec: false, smoke: false, moveUp:false, moveDown:false, moveLeft:false, moveRight:false, aimLeft:false, aimRight:false, touch:false, mouse:null };
+  const tin = { joy: null, joy2: null, joyX:0, joyY:0, cannon: false, mg: false, spec: false, smoke: false, moveUp:false, moveDown:false, moveLeft:false, moveRight:false, aimLeft:false, aimRight:false, touch:false, mouse:null };
   const mobileCfg = Object.assign({ opacity: 78, sensitivity: 100, size: 100, style: "verde" }, store.get("mobileControls") || {});
   function applyMobileCfg() {
     const root = document.documentElement;
@@ -4032,6 +4034,7 @@
     document.body.classList.remove("tank");
     tkeys.clear();
     tin.cannon = tin.mg = tin.spec = tin.smoke = tin.moveUp = tin.moveDown = tin.moveLeft = tin.moveRight = tin.aimLeft = tin.aimRight = false;
+    tin.joyX = tin.joyY = 0; tin.mouse = null;
     try {
       if (document.fullscreenElement) document.exitFullscreen();
     } catch (e) {}
@@ -4759,7 +4762,10 @@
     let fwd = (tkeys.has("w") ? 1 : 0) - (tkeys.has("s") ? 1 : 0),
       rot = (tkeys.has("d") ? 1 : 0) - (tkeys.has("a") ? 1 : 0);
     const sens = mobileCfg.sensitivity / 100;
-    if (tin.moveUp || tin.moveDown || tin.moveLeft || tin.moveRight) {
+    if (mobileTouch && (Math.abs(tin.joyX) > 0.04 || Math.abs(tin.joyY) > 0.04)) {
+      fwd = -tin.joyY;
+      rot = tin.joyX;
+    } else if (tin.moveUp || tin.moveDown || tin.moveLeft || tin.moveRight) {
       fwd = (tin.moveUp ? 1 : 0) - (tin.moveDown ? 1 : 0);
       rot = (tin.moveRight ? 1 : 0) - (tin.moveLeft ? 1 : 0);
     } else if (pad.lx || pad.ly) {
@@ -5686,8 +5692,8 @@
   }
   function tUI() {
     if (!T || !LV) return;
-    const sl = `${ACC[specSel].n.toUpperCase()} · E / L1 · ${acc[specSel].own ? "x" + acc[specSel].ammo : "NÃO COLETADO"}`,
-      fl = `FUMAÇA · Q / L2 ${acc.smoke.own ? "x" + acc.smoke.ammo : ""}`;
+    const sl = mobileTouch ? `🚀 ${ACC[specSel].n.toUpperCase()} x${acc[specSel].ammo}` : `${ACC[specSel].n.toUpperCase()} · E / L1 · ${acc[specSel].own ? "x" + acc[specSel].ammo : "NÃO COLETADO"}`,
+      fl = mobileTouch ? `☁ FUMAÇA x${acc.smoke.ammo}` : `FUMAÇA · Q / L2 ${acc.smoke.own ? "x" + acc.smoke.ammo : ""}`;
     if ($("tbSpec").textContent !== sl) $("tbSpec").textContent = sl;
     if ($("tbSmoke").textContent !== fl) $("tbSmoke").textContent = fl;
     const boss = tz.find((z) => z.d.big && !z.dead);
@@ -5765,7 +5771,7 @@
     const release=()=>{tin[key]=false;b.classList.remove("on");};
     b.addEventListener("pointerup",release); b.addEventListener("pointercancel",release); b.addEventListener("lostpointercapture",release);
   };
-  [["mvUp","moveUp"],["mvDown","moveDown"],["mvLeft","moveLeft"],["mvRight","moveRight"],["aimLeft","aimLeft"],["aimRight","aimRight"],["tbCannon","cannon"],["tbMG","mg"],["tbSpec","spec"],["tbSmoke","smoke"]].forEach(([id,key])=>pressControl(id,key));
+  [["mvUp","moveUp"],["mvDown","moveDown"],["mvLeft","moveLeft"],["mvRight","moveRight"],["aimLeft","aimLeft"],["aimRight","aimRight"],["tbSpec","spec"],["tbSmoke","smoke"]].forEach(([id,key])=>pressControl(id,key));
   // Arrastar os grupos para personalizar a posição dos controles.
   document.querySelectorAll("[data-drag]").forEach(el=>{
     let drag=null;
@@ -5786,31 +5792,23 @@
     audio();
     cycleSpec(1);
   });
-  for (const [id, key] of [
-    ["tbCannon", "cannon"],
-    ["tbMG", "mg"],
-    ["tbSpec", "spec"],
-    ["tbSmoke", "smoke"],
-  ]) {
-    const b = $(id);
-    b.addEventListener("pointerdown", (e) => {
-      audio();
-      e.preventDefault();
-      try {
-        b.setPointerCapture(e.pointerId);
-      } catch (err) {}
-      tin[key] = true;
-      tin.touch = true;
-      tin.mouse = null;
-      b.classList.add("on");
-    });
-    const up = () => {
-      tin[key] = false;
-      b.classList.remove("on");
-    };
-    b.addEventListener("pointerup", up);
-    b.addEventListener("pointercancel", up);
+  // Multi-touch: cada polegar mantém seu próprio pointerId.
+  const moveStick=$("moveStick");
+  if(moveStick){let pid=null;const update=e=>{const r=moveStick.getBoundingClientRect(),lim=Math.min(r.width,r.height)*.34;let x=e.clientX-r.left-r.width/2,y=e.clientY-r.top-r.height/2,d=Math.hypot(x,y)||1,k=Math.min(1,lim/d);tin.joyX=x*k/lim;tin.joyY=y*k/lim;const knob=moveStick.querySelector("i");if(knob)knob.style.transform=`translate(${tin.joyX*lim}px,${tin.joyY*lim}px)`;};
+    moveStick.addEventListener("pointerdown",e=>{if(!mobileTouch||MODE!=="tank"||state!=="play")return;e.preventDefault();audio();pid=e.pointerId;moveStick.setPointerCapture(pid);update(e);});
+    moveStick.addEventListener("pointermove",e=>{if(e.pointerId===pid){e.preventDefault();update(e);}});
+    const up=e=>{if(e.pointerId!==pid)return;pid=null;tin.joyX=tin.joyY=0;const k=moveStick.querySelector("i");if(k)k.style.transform="translate(0,0)";};
+    ["pointerup","pointercancel","lostpointercapture"].forEach(n=>moveStick.addEventListener(n,up));
   }
+  const aimFire=$("tbCannon");
+  if(aimFire){let pid=null;const aimAt=e=>{const r=cv.getBoundingClientRect(),sx=(e.clientX-r.left)*VIEW.w/r.width+cam.x,sy=(e.clientY-r.top)*VIEW.h/r.height+cam.y;tin.mouse=wunproject(sx,sy);tin.touch=true;};
+    aimFire.addEventListener("pointerdown",e=>{if(!mobileTouch||MODE!=="tank"||state!=="play")return;e.preventDefault();audio();pid=e.pointerId;aimFire.setPointerCapture(pid);tin.cannon=true;aimFire.classList.add("on");aimAt(e);});
+    aimFire.addEventListener("pointermove",e=>{if(e.pointerId===pid){e.preventDefault();aimAt(e);}});
+    const up=e=>{if(e.pointerId!==pid)return;pid=null;tin.cannon=false;aimFire.classList.remove("on");};["pointerup","pointercancel","lostpointercapture"].forEach(n=>aimFire.addEventListener(n,up));
+  }
+  const mgButton=$("tbMG");
+  if(mgButton){let pid=null;mgButton.addEventListener("pointerdown",e=>{if(!mobileTouch||MODE!=="tank"||state!=="play")return;e.preventDefault();audio();pid=e.pointerId;mgButton.setPointerCapture(pid);tin.mg=true;mgButton.classList.add("on");});const up=e=>{if(e.pointerId!==pid)return;pid=null;tin.mg=false;mgButton.classList.remove("on");};["pointerup","pointercancel","lostpointercapture"].forEach(n=>mgButton.addEventListener(n,up));}
+  const mineButton=$("tbMine");if(mineButton)mineButton.addEventListener("click",()=>{if(mobileTouch&&MODE==="tank"&&state==="play"){audio();useAcc("mine",T,1);}});
   $("tpause").addEventListener("click", () => { audio(); togglePause(); });
   $("tOptions").addEventListener("click", () => { audio(); $("tOptionsPanel").hidden = !$("tOptionsPanel").hidden; });
   $("ctlClose").addEventListener("click", () => { $("tOptionsPanel").hidden = true; });
