@@ -1332,3 +1332,50 @@ html.mobile-controls body.tank #stage{
 @media(orientation:landscape) and (pointer:coarse){
   html.mobile-controls #avMultiLink{top:max(8px,env(safe-area-inset-top))!important}
 }
+
+
+/* v31 — menus e garagem em paisagem: rolagem contida, safe-area e botões compactos */
+@media (orientation: landscape) and (pointer: coarse) {
+  #ov {
+    place-items: start center;
+    padding: max(8px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right))
+      max(8px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+    overscroll-behavior: contain;
+  }
+  #ov .panel {
+    width: min(100%, 980px);
+    max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 16px);
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding: clamp(10px, 2.2vh, 18px);
+    margin: auto;
+  }
+  #ov .title { font-size: clamp(18px, 4.8vh, 34px) !important; }
+  #ov .sub, #ov .hint { font-size: clamp(8px, 1.8vh, 10px); margin-bottom: 8px; }
+  #ov .menu-btns { display:flex; flex-wrap:wrap; justify-content:center; gap:5px; }
+  #ov .big, #ov .alt { min-height:38px; padding:8px 12px; margin:3px; font-size:clamp(8px,1.7vh,11px); }
+  #ov .ugrid { grid-template-columns: repeat(auto-fit, minmax(min(170px, 28vw), 1fr)); gap:7px; }
+  #ov .ucard { padding:8px; }
+  #ov .topts { grid-template-columns: repeat(auto-fit, minmax(min(135px, 25vw), 1fr)); gap:5px; }
+  #ov .opt { min-height:38px; padding:6px 4px; font-size:8px; }
+  #ov .tart { max-height:18vh; width:auto; max-width:100%; object-fit:contain; }
+  #ov #tprev { max-height:25vh; width:auto; max-width:100%; aspect-ratio:560/300; }
+  #ov .tstats { gap:8px; font-size:7px; margin-bottom:6px; }
+  #ov .trow { margin:5px 0; }
+  #ov .form { max-width: min(420px, 80vw); }
+  #avMultiLink {
+    left:auto !important; right:max(10px,env(safe-area-inset-right)) !important;
+    top:max(8px,env(safe-area-inset-top)) !important; bottom:auto !important;
+  }
+}
+@media (pointer: coarse) {
+  /* O link multiplayer fica no alto à direita, longe do apoio do polegar esquerdo. */
+  #avMultiLink {
+    left:auto !important;
+    right:max(12px,env(safe-area-inset-right)) !important;
+    top:max(10px,env(safe-area-inset-top)) !important;
+    bottom:auto !important;
+  }
+  #ov { overscroll-behavior: contain; }
+  #ov .panel { -webkit-overflow-scrolling: touch; }
+}
