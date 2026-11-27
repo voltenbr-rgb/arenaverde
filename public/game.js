@@ -5841,8 +5841,15 @@
     ["pointerup","pointercancel","lostpointercapture"].forEach(n=>moveStick.addEventListener(n,up));
   }
   const aimFire=$("tbCannon");
-  if(aimFire){let pid=null;aimFire.addEventListener("pointerdown",e=>{if(!mobileTouch||MODE!=="tank"||state!=="play"||pid!==null)return;e.preventDefault();audio();pid=e.pointerId;aimFire.setPointerCapture(pid);tin.cannon=true;aimFire.classList.add("on");});
-    const up=e=>{if(e.pointerId!==pid)return;pid=null;tin.cannon=false;aimFire.classList.remove("on");};["pointerup","pointercancel","lostpointercapture"].forEach(n=>aimFire.addEventListener(n,up));
+  // Um PointerId por dedo: dois toques simultâneos não se cancelam nem prendem o disparo.
+  if(aimFire){const activePointers=new Set();aimFire.addEventListener("pointerdown",e=>{
+    if(!mobileTouch||MODE!=="tank"||state!=="play")return;
+    e.preventDefault();audio();activePointers.add(e.pointerId);
+    try{aimFire.setPointerCapture(e.pointerId)}catch(err){}
+    tin.cannon=activePointers.size>0;aimFire.classList.add("on");
+  });
+    const up=e=>{if(!activePointers.delete(e.pointerId))return;tin.cannon=activePointers.size>0;aimFire.classList.toggle("on",tin.cannon);};
+    ["pointerup","pointercancel","lostpointercapture"].forEach(n=>aimFire.addEventListener(n,up));
   }
   // Dois lados de toque: manter o lado esquerdo/direito pressionado gira a torreta; soltar para imediatamente.
   [["aimPadLeft","aimLeft"],["aimPadRight","aimRight"]].forEach(([id,key])=>{
@@ -5867,7 +5874,15 @@
     setTimeout(()=>centerTurret.classList.remove("on"),120);
   });
   const mgButton=$("tbMG");
-  if(mgButton){let pid=null;mgButton.addEventListener("pointerdown",e=>{if(!mobileTouch||MODE!=="tank"||state!=="play")return;e.preventDefault();audio();pid=e.pointerId;mgButton.setPointerCapture(pid);tin.mg=true;mgButton.classList.add("on");});const up=e=>{if(e.pointerId!==pid)return;pid=null;tin.mg=false;mgButton.classList.remove("on");};["pointerup","pointercancel","lostpointercapture"].forEach(n=>mgButton.addEventListener(n,up));}
+  if(mgButton){const activePointers=new Set();mgButton.addEventListener("pointerdown",e=>{
+    if(!mobileTouch||MODE!=="tank"||state!=="play")return;
+    e.preventDefault();audio();activePointers.add(e.pointerId);
+    try{mgButton.setPointerCapture(e.pointerId)}catch(err){}
+    tin.mg=activePointers.size>0;mgButton.classList.add("on");
+  });
+    const up=e=>{if(!activePointers.delete(e.pointerId))return;tin.mg=activePointers.size>0;mgButton.classList.toggle("on",tin.mg);};
+    ["pointerup","pointercancel","lostpointercapture"].forEach(n=>mgButton.addEventListener(n,up));
+  }
   const mineButton=$("tbMine");if(mineButton)mineButton.addEventListener("click",()=>{if(mobileTouch&&MODE==="tank"&&state==="play"){audio();useAcc("mine",T,1);}});
   $("tpause").addEventListener("click", () => { audio(); togglePause(); });
   $("tOptions").addEventListener("click", () => { audio(); $("tOptionsPanel").hidden = !$("tOptionsPanel").hidden; });
