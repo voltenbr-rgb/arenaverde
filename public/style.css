@@ -1205,3 +1205,30 @@ html[data-ctlstyle="discreto"] body.tank #tctl .stick{background:#0003;border-co
 html[data-ctlstyle="discreto"] body.tank #tctl .tbtns button,html[data-ctlstyle="discreto"] body.tank #tctl .tbtns2 button{background:#0008;border-color:#ffffff55}
 @media(orientation:portrait) and (pointer:coarse){body.tank #tctl .stick{width:calc(clamp(96px,25vmin,130px) * var(--ctl-size))}body.tank #tctl .tbtns{right:calc(max(8px,env(safe-area-inset-right)) + clamp(96px,25vmin,130px) + 6px)}body.tank #tctl .tbtns2{bottom:calc(max(8px,env(safe-area-inset-bottom)) + clamp(96px,25vmin,130px) + 8px)}}
 @media(pointer:fine){body.tank #tctl{display:none!important}}
+
+/* D-pad e comandos direcionais para celular; sem analógicos */
+body.tank #tctl .stick{display:none!important}
+body.tank #tctl .arrow-pad,body.tank #tctl .aim-pad{position:absolute;display:grid;gap:6px;pointer-events:auto;touch-action:none;opacity:var(--ctl-opacity);z-index:4}
+body.tank #movePad{left:5%;bottom:7%;grid-template-columns:repeat(3,clamp(43px,11vmin,60px));grid-template-rows:repeat(2,clamp(43px,11vmin,60px))}
+body.tank #movePad #mvUp{grid-column:2;grid-row:1}
+body.tank #movePad #mvLeft{grid-column:1;grid-row:2}
+body.tank #movePad #mvDown{grid-column:2;grid-row:2}
+body.tank #movePad #mvRight{grid-column:3;grid-row:2}
+body.tank #aimPad{right:23%;bottom:8%;grid-template-columns:repeat(2,clamp(45px,11vmin,62px))}
+body.tank #tctl .arrow-pad button,body.tank #tctl .aim-pad button{width:calc(clamp(43px,11vmin,60px)*var(--ctl-size));height:calc(clamp(43px,11vmin,60px)*var(--ctl-size));border-radius:13px;border:2px solid #e5f4d2a8;background:#1b2b16c9;color:#fff;font:900 23px Arial;text-shadow:0 2px 3px #000;box-shadow:0 4px 12px #0008;touch-action:none}
+body.tank #tctl .aim-pad button{background:#18364bd9;border-color:#9bdcff;font-size:25px}
+body.tank #tctl .arrow-pad button.on,body.tank #tctl .aim-pad button.on{filter:brightness(1.7);transform:scale(.94)}
+body.tank #tctl .tbtns{right:5%;bottom:7%;z-index:4}
+body.tank #tctl .tbtns2{right:5%;bottom:calc(7% + 76px);z-index:4}
+body.tank #tOptions{z-index:8}
+body.tank #tOptionsPanel{z-index:10}
+html.ctl-edit body.tank #tctl [data-drag]{outline:2px dashed #ffe47a;outline-offset:5px;cursor:move;touch-action:none}
+html.ctl-edit body.tank #tctl [data-drag] button{pointer-events:none}
+html.ctl-edit body.tank #tctl [data-drag]::after{content:"ARRASTE";position:absolute;top:-16px;left:0;color:#ffe47a;font:700 8px Arial;text-shadow:0 1px 3px #000}
+@media(orientation:portrait) and (pointer:coarse){
+ body.tank #movePad{left:4%;bottom:8%}
+ body.tank #aimPad{right:5%;bottom:calc(8% + 132px)}
+ body.tank #tctl .tbtns{right:5%;bottom:8%}
+ body.tank #tctl .tbtns2{right:5%;bottom:calc(8% + 78px)}
+}
+@media(pointer:fine){body.tank #tctl{display:none!important}}
