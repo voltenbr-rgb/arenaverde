@@ -1,4 +1,3 @@
-import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
 const $=id=>document.getElementById(id), lobby=$("lobby"), game=$("game");
 $("back").onclick=()=>location.href="/";
 let mode="coop",running=false,paused=false,last=0,elapsed=0,score=0,round=1;
@@ -143,7 +142,7 @@ function boom(pos){const m=new THREE.Mesh(new THREE.SphereGeometry(.6,12,10),new
 function controls(t,dt){
  if(!t.alive)return;
  if(t.aiAlly){const target=tanks.find(x=>x.player===1),foe=enemies.filter(x=>x.alive).sort((a,b)=>a.root.position.distanceTo(t.root.position)-b.root.position.distanceTo(t.root.position))[0];if(target){const desired=target.root.position.clone().add(new THREE.Vector3(-Math.sin(target.root.rotation.y)*6,0,-Math.cos(target.root.rotation.y)*6));const dx=desired.x-t.root.position.x,dz=desired.z-t.root.position.z,dist=Math.hypot(dx,dz);if(dist>4){const ang=Math.atan2(dx,dz);t.root.rotation.y=THREE.MathUtils.damp(t.root.rotation.y,ang,2.3,dt);t.speed=THREE.MathUtils.damp(t.speed,Math.min(7,dist)*.8,1.7,dt);t.root.position.x+=Math.sin(t.root.rotation.y)*t.speed*dt;t.root.position.z+=Math.cos(t.root.rotation.y)*t.speed*dt}else t.speed=THREE.MathUtils.damp(t.speed,0,3,dt);if(foe){const ax=foe.root.position.x-t.root.position.x,az=foe.root.position.z-t.root.position.z,ang=Math.atan2(ax,az);t.turret.rotation.y=THREE.MathUtils.damp(t.turret.rotation.y,ang-t.root.rotation.y,3,dt);t.cool=Math.max(0,t.cool-dt);if(t.cool<=0&&Math.hypot(ax,az)<42)fire(t)}}return}
- const p=t.player,forward=p===1?(keys.has("w")?1:0)-(keys.has("s")?1:0):(keys.has("ArrowUp")?1:0)-(keys.has("ArrowDown")?1:0),turn=p===1?(keys.has("a")?1:0)-(keys.has("d")?1:0):(keys.has("ArrowLeft")?1:0)-(keys.has("ArrowRight")?1:0),turret=p===1?(keys.has("q")?1:0)-(keys.has("e")?1:0):(keys.has(",")?1:0)-(keys.has(".")?1:0);
+ const p=t.player,forward=p===1?(keys.has("w")?1:0)-(keys.has("s")?1:0):(keys.has("ArrowUp")?1:0)-(keys.has("ArrowDown")?1:0),turn=p===1?(keys.has("d")?1:0)-(keys.has("a")?1:0):(keys.has("ArrowRight")?1:0)-(keys.has("ArrowLeft")?1:0),turret=p===1?(keys.has("q")?1:0)-(keys.has("e")?1:0):(keys.has(",")?1:0)-(keys.has(".")?1:0);
  const maxSpeed=forward<0?4.2:10.5,desired=forward*maxSpeed;
  t.speed=THREE.MathUtils.damp(t.speed,desired,forward===0?2.2:3.8,dt);
  const steerFactor=.34+Math.min(1,Math.abs(t.speed)/6)*.72;
