@@ -20,3 +20,12 @@
 @media(max-width:700px){.radar{width:54px;height:54px;right:8px;top:8px}.radar span{left:24px;top:24px}.radar i{right:11px;top:13px}.radar b{left:12px;bottom:13px}.reticle{top:43%}#game.solo .view{min-height:0}}
 
 #controllerHint{color:#c4d99b;font-size:11px;letter-spacing:.5px}@media(max-width:700px),(pointer:coarse){#shell:before{content:"MODO TANQUES 3D DISPONÍVEL SOMENTE NO COMPUTADOR";position:fixed;inset:0;z-index:99;display:grid;place-items:center;text-align:center;padding:28px;background:#10170d;color:#d9f0ad;font-weight:900;font-size:20px}#shell>*{visibility:hidden}}
+
+#healthHud{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.hpCard{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:10px;padding:7px 11px;background:linear-gradient(100deg,#172114,#26351c);border:1px solid #788c50;box-shadow:inset 0 1px #d1d9a822}
+.hpCard b{font-size:11px;letter-spacing:.7px;color:#dce9bd}.hpCard strong{font-size:13px;color:#bde66c;font-variant-numeric:tabular-nums}
+.hpTrack{height:11px;background:#080d08;border:1px solid #53613c;overflow:hidden;border-radius:2px}
+.hpTrack i{display:block;width:100%;height:100%;background:linear-gradient(90deg,#5c9b32,#b8e34b);transition:width .12s linear,background .12s}
+.hpTrack i.low{background:linear-gradient(90deg,#9d2924,#f0783c)}
+.hpCard.destroyed{opacity:.45}.hpCard.destroyed strong{color:#f06b5c}
+@media(max-width:700px){#healthHud{gap:4px}.hpCard{grid-template-columns:1fr auto;gap:5px;padding:5px}.hpCard b{font-size:9px}.hpTrack{grid-column:1/-1;grid-row:2}.hpCard strong{font-size:11px}}
