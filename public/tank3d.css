@@ -31,3 +31,7 @@
 @media(max-width:700px){#healthHud{gap:4px}.hpCard{grid-template-columns:1fr auto;gap:5px;padding:5px}.hpCard b{font-size:9px}.hpTrack{grid-column:1/-1;grid-row:2}.hpCard strong{font-size:11px}}
 
 #weaponLabel{color:#d6e7a9;background:#172114;border:1px solid #8b9c5c;padding:5px 10px;font-size:11px;font-weight:900;text-align:center;letter-spacing:1px}
+
+/* Mira limpa: oculta o ponteiro do sistema durante o combate; retículas ficam visíveis nos dois jogadores. */
+#game .view,#game .view canvas{cursor:none!important}
+#view2Wrap .reticle{opacity:.85}
