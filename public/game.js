@@ -6148,7 +6148,7 @@
     cv.style.width = fxc.style.width = Math.floor(VW * s) + "px";
     cv.style.height = fxc.style.height = Math.floor(VH * s) + "px";
     CSS_S = s;
-    const nf = Math.round(Math.min(1.6, s * dpr) * 20) / 20; // pixels do canvas por unidade de tela
+    const nf = Math.round(Math.min(mobileTouch ? 1.2 : 1.6, s * dpr) * 20) / 20; // pixels do canvas por unidade de tela
     if (nf !== FS || !vign || cv.width !== Math.round(VW * nf)) {
       FS = nf;
       fxc.width = cv.width = Math.round(VW * FS);
