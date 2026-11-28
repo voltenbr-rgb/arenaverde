@@ -18,3 +18,5 @@
 .radar i{position:absolute;width:5px;height:5px;border-radius:50%;background:#e45c42;right:16px;top:18px}.radar b{position:absolute;width:4px;height:4px;border-radius:50%;background:#7cb7dc;left:17px;bottom:18px}
 #hud{backdrop-filter:blur(5px)}
 @media(max-width:700px){.radar{width:54px;height:54px;right:8px;top:8px}.radar span{left:24px;top:24px}.radar i{right:11px;top:13px}.radar b{left:12px;bottom:13px}.reticle{top:43%}#game.solo .view{min-height:0}}
+
+#controllerHint{color:#c4d99b;font-size:11px;letter-spacing:.5px}@media(max-width:700px){#shell:before{content:"MODO TANQUES 3D DISPONÍVEL SOMENTE NO COMPUTADOR";position:fixed;inset:0;z-index:99;display:grid;place-items:center;text-align:center;padding:28px;background:#10170d;color:#d9f0ad;font-weight:900;font-size:20px}body:has(#shell:before) #shell>*{visibility:hidden}}
