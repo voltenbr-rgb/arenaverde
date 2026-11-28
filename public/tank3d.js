@@ -16,7 +16,7 @@ function makeTank(color=0x455735){
  box(hull,3.5,.85,5.1,paint,0,1.05,0);box(hull,3.2,.28,4.6,camo,0,1.55,-.05);
  for(const side of [-1,1]){box(hull,.48,.85,5.25,dark,side*1.78,.72,0);for(let i=0;i<7;i++){const wheel=new THREE.Mesh(new THREE.CylinderGeometry(.43,.43,.22,16),rubber);wheel.rotation.z=Math.PI/2;wheel.position.set(side*2,.55,-1.85+i*.62);wheel.castShadow=true;hull.add(wheel);const hub=new THREE.Mesh(new THREE.CylinderGeometry(.18,.18,.235,12),metal);hub.rotation.z=Math.PI/2;hub.position.copy(wheel.position);hub.position.x+=side*.02;hull.add(hub)}}
  box(hull,2.2,.52,2.35,paint,0,1.78,-.35);const turret=new THREE.Group();turret.position.set(0,2.08,-.25);hull.add(turret);box(turret,2.15,.65,2.15,paint,0,0,0);box(turret,1.5,.18,1.6,camo,0,.38,-.05);
- const barrel=new THREE.Group();barrel.position.set(0,.05,-.8);turret.add(barrel);const tube=new THREE.Mesh(new THREE.CylinderGeometry(.16,.22,3.1,12),metal);tube.rotation.x=Math.PI/2;tube.position.z=-1.45;tube.castShadow=true;barrel.add(tube);box(barrel,.48,.34,.48,dark,0,0,-2.8);
+ const barrel=new THREE.Group();barrel.position.set(0,.05,.8);turret.add(barrel);const tube=new THREE.Mesh(new THREE.CylinderGeometry(.16,.22,3.1,12),metal);tube.rotation.x=Math.PI/2;tube.position.z=1.45;tube.castShadow=true;barrel.add(tube);box(barrel,.48,.34,.48,dark,0,0,2.8);
  box(turret,.55,.38,.6,glass,0,.43,.45);for(let i=0;i<5;i++)box(hull,.16,.13,.18,edge,-1.25+i*.62,2.12,1.55);
  return {root,hull,turret,barrel,hp:100,maxHp:100,cool:0,speed:0,turn:0,player:0,alive:true};
 }
