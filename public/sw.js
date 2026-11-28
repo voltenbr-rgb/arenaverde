@@ -1,9 +1,12 @@
 // Arena Verde — service worker: funciona offline e pega versões novas automaticamente.
-const V = "arenaverde-v34";
+const V = "arenaverde-v35";
 const SHELL = [
   "/",
   "/style.css",
   "/game.js",
+  "/tank3d.html",
+  "/tank3d.css",
+  "/tank3d.js",
   "/manifest.webmanifest",
   "/assets/maps/arena.jpg",
   "/icons/icon-192.png",
