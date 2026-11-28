@@ -2824,7 +2824,7 @@
   function showMenu() {
     const canContinue = progress && progress.wave_atual > 1 && progress.wave_atual <= MAX_WAVE;
     showOv(`<h1 class="title">ARENA<br>VERDE</h1><p class="sub">${profile ? `Soldado ${esc(profile.apelido)} · ` : ""}Defenda a base por ${MAX_WAVE} ondas</p><canvas id="scene" width="960" height="400"></canvas>
- <div class="menu-btns">${canContinue ? `<button class="big" data-a="continue">CONTINUAR · ONDA ${progress.wave_atual}</button>` : ""}<button class="${canContinue ? "alt" : "big"}" data-a="squad">${canContinue ? "NOVO JOGO" : "JOGAR ▶"}</button><button class="big tbtn" data-a="tsetup">MODO TANQUE ▶</button><button class="alt" data-a="enemies">INIMIGOS</button><button class="alt" data-a="profile">${profile ? "PERFIL" : "CRIAR PERFIL"}</button><button class="alt" id="bInstall" data-a="install" ${deferredInstall ? "" : "hidden"}>INSTALAR APP</button></div>
+ <div class="menu-btns">${canContinue ? `<button class="big" data-a="continue">CONTINUAR · ONDA ${progress.wave_atual}</button>` : ""}<button class="${canContinue ? "alt" : "big"}" data-a="squad">${canContinue ? "NOVO JOGO" : "JOGAR ▶"}</button><button class="big tbtn" data-a="tsetup">MODO TANQUE ▶</button><button class="big" data-a="t3d">NOVO MODO · TANQUES 3D ▶</button><button class="alt" data-a="enemies">INIMIGOS</button><button class="alt" data-a="profile">${profile ? "PERFIL" : "CRIAR PERFIL"}</button><button class="alt" id="bInstall" data-a="install" ${deferredInstall ? "" : "hidden"}>INSTALAR APP</button></div>
  ${isIOS && !isStandalone() ? '<p class="hint">No iPhone: toque em Compartilhar e depois em "Adicionar à Tela de Início" para instalar.</p>' : ""}
  <details class="how"><summary>★ COMO JOGAR</summary><ul class="how"><li>Monte um esquadrão de até 6 cartas</li><li>Toque numa carta e depois numa casa da grade</li><li>Você ganha moedas com o tempo, abatendo zumbis e pegando caixas de suprimento</li><li>Zumbis que passam pelos sacos de areia tiram vida da base</li><li>Sobreviva às ${MAX_WAVE} ondas: na última vem o Chefão Metralhadora</li><li>Metralhadora libera na onda ${UNLOCK_AT.mg} e Morteiro na onda ${UNLOCK_AT.mortar}</li><li>PC: teclas 1–6, Q pá, P pausa, F velocidade</li></ul></details>
  <div class="rec">RECORDE: ${best}</div><ol class="board" id="board"></ol>`);
@@ -2998,7 +2998,7 @@
       camp = { m: 0, money: 100, lv: {}, score: 0, acc: accDefault() };
       saveCamp();
       tStart();
-    } else if (k === "tsetup") showTankPlayers();
+    } else if (k === "tsetup") showTankPlayers(); else if (k === "t3d") { location.href = "/tank3d.html"; }
     else if (k === "tplayers") { tankPlayers=+(a.dataset.n||1); if(tankPlayers===2) showTankSelect(1); else showTankSetup();
     } else if (k === "tselect") { const p=+(a.dataset.p||tankSetupPlayer), v=a.dataset.v, g=a.dataset.g||"camo"; if(v){ if(p===1) tcfg[g]=v; else tcfg2[g]=v; showTankSelect(p); return; } if(p===1) showTankSelect(2); else { store.set("tank2",tcfg2); showTankSetup(); }
     } else if (k === "tgo") {
