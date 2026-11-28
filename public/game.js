@@ -1214,6 +1214,12 @@
   const rnd = (a, b) => a + Math.random() * (b - a);
   // efeito: converte a posição da grade para o espaço da tela (÷K); o.row força a linha
   function add(o) {
+    // Limite de partículas para evitar picos de CPU/GPU em sessões longas no celular.
+    const fxLimit = mobileTouch ? 420 : 900;
+    if (fxs.length >= fxLimit) {
+      if (mobileTouch || o.k === "g" || o.k === "s") return;
+      fxs.splice(0, fxs.length - fxLimit + 1);
+    }
     if (MODE === "tank") {
       if (o.gy != null) {
         o.lx = o.x;
@@ -5572,6 +5578,7 @@
   }
 
   /* ---------- desenho do modo tanque ---------- */
+  const terrainTiles = new WeakMap();
   function tRender() {
     const VWt = VIEW.w,
       VHt = VIEW.h,
@@ -5595,39 +5602,50 @@
       Lc = LV.L / CELL,
       Wc = W_CELLS;
     ctx.setTransform(M[0], M[1], M[2], M[3], M[4], M[5]);
+    // Cada quadrado do terreno é desenhado uma única vez e reutilizado ao mover a câmera.
+    let tileCache = terrainTiles.get(th);
+    if (!tileCache) { tileCache = new Map(); terrainTiles.set(th, tileCache); }
     for (let u = Math.max(u0, -8); u <= Math.min(u1, Lc + 8); u++)
       for (let v = Math.max(v0, -6); v <= Math.min(v1, Wc + 6); v++) {
-        const out = u < 0 || u >= Lc || v < 0 || v >= Wc,
-          cx = (u + 0.5) * CELL,
-          ry = roadY(cx),
-          onRoad = !out && Math.abs((v + 0.5) * CELL - ry) < CELL * 1.1,
-          hv = hash(u, v);
-        ctx.fillStyle = out ? th.edge : onRoad ? ((u + v) % 2 ? th.road : th.road2) : th.g[(u + v) & 1];
-        ctx.fillRect(u * CELL, v * CELL, CELL + 0.6, CELL + 0.6);
-        if (!out) {
-          // Textura orgânica de terra/grama em manchas suaves, mantendo a grade para navegação.
-          if (!onRoad && hv > .24) {
-            ctx.fillStyle = `rgba(8,18,7,${.035 + hash(u + 17, v + 31) * .055})`;
-            ctx.beginPath();
-            ctx.ellipse(u * CELL + 5 + hash(u + 4, v) * 22, v * CELL + 5 + hash(u, v + 8) * 22,
-              3 + hash(u + 9, v) * 6, 1.4 + hash(u, v + 12) * 2.6, hash(u, v) * .8, 0, Math.PI * 2);
-            ctx.fill();
+        const key = u + "," + v;
+        let tile = tileCache.get(key);
+        if (!tile) {
+          tile = mk(CELL + 2, CELL + 2);
+          const tc = tile.getContext("2d");
+          const out = u < 0 || u >= Lc || v < 0 || v >= Wc,
+            cx = (u + 0.5) * CELL,
+            ry = roadY(cx),
+            onRoad = !out && Math.abs((v + 0.5) * CELL - ry) < CELL * 1.1,
+            hv = hash(u, v),
+            ox = u * CELL, oy = v * CELL;
+          tc.fillStyle = out ? th.edge : onRoad ? ((u + v) % 2 ? th.road : th.road2) : th.g[(u + v) & 1];
+          tc.fillRect(0, 0, CELL + 2, CELL + 2);
+          if (!out) {
+            if (!onRoad && hv > .24) {
+              tc.fillStyle = `rgba(8,18,7,${.035 + hash(u + 17, v + 31) * .055})`;
+              tc.beginPath();
+              tc.ellipse(5 + hash(u + 4, v) * 22, 5 + hash(u, v + 8) * 22,
+                3 + hash(u + 9, v) * 6, 1.4 + hash(u, v + 12) * 2.6, hash(u, v) * .8, 0, Math.PI * 2);
+              tc.fill();
+            }
+            if (onRoad && hv > .52) {
+              tc.fillStyle = "rgba(18,13,8,.10)";
+              tc.fillRect(3 + hash(u, v + 2) * 17, 4 + hash(u + 3, v) * 15, 5, .7);
+            }
+            tc.fillStyle = onRoad ? "rgba(0,0,0,.12)" : th.tuft;
+            for (let k = 0; k < 4; k++) {
+              const px = hash(u + k, v) * 21 + 1,
+                py = hash(u, v + k) * 21 + 1;
+              tc.fillRect(px, py, onRoad ? 2.5 : 1.2, onRoad ? 1.2 : 2.5);
+            }
+            if (hv > 0.93 && !onRoad) {
+              tc.fillStyle = "#e8d36a";
+              tc.fillRect(8, 9, 1.6, 1.6);
+            }
           }
-          if (onRoad && hv > .52) {
-            ctx.fillStyle = "rgba(18,13,8,.10)";
-            ctx.fillRect(u * CELL + 3 + hash(u, v + 2) * 17, v * CELL + 4 + hash(u + 3, v) * 15, 5, .7);
-          }
-          ctx.fillStyle = onRoad ? "rgba(0,0,0,.12)" : th.tuft;
-          for (let k = 0; k < 4; k++) {
-            const px = u * CELL + hash(u + k, v) * 21 + 1,
-              py = v * CELL + hash(u, v + k) * 21 + 1;
-            ctx.fillRect(px, py, onRoad ? 2.5 : 1.2, onRoad ? 1.2 : 2.5);
-          }
-          if (hv > 0.93 && !onRoad) {
-            ctx.fillStyle = "#e8d36a";
-            ctx.fillRect(u * CELL + 8, v * CELL + 9, 1.6, 1.6);
-          }
+          tileCache.set(key, tile);
         }
+        ctx.drawImage(tile, u * CELL, v * CELL);
       }
     // borda do mapa
     ctx.strokeStyle = "rgba(0,0,0,.35)";
@@ -6114,7 +6132,7 @@
       cv.style.width = fxc.style.width = aw + "px";
       cv.style.height = fxc.style.height = ah + "px";
       CSS_S = s;
-      const nf = Math.round(Math.min(1.6, s * dpr) * 20) / 20;
+      const nf = Math.round(Math.min(mobileTouch ? 1.2 : 1.6, s * dpr) * 20) / 20;
       if (nf !== FS || !vign || cv.width !== Math.round(vw * nf) || cv.height !== Math.round(vh * nf)) {
         FS = nf;
         fxc.width = cv.width = Math.round(vw * FS);
@@ -6130,7 +6148,7 @@
     cv.style.width = fxc.style.width = Math.floor(VW * s) + "px";
     cv.style.height = fxc.style.height = Math.floor(VH * s) + "px";
     CSS_S = s;
-    const nf = Math.round(Math.min(1.6, s * dpr) * 20) / 20; // pixels do canvas por unidade de tela
+    const nf = Math.round(Math.min(mobileTouch ? 1.2 : 1.6, s * dpr) * 20) / 20; // pixels do canvas por unidade de tela
     if (nf !== FS || !vign || cv.width !== Math.round(VW * nf)) {
       FS = nf;
       fxc.width = cv.width = Math.round(VW * FS);
@@ -6141,8 +6159,13 @@
   const ro = new ResizeObserver(fit);
   ro.observe($("stage"));
   fit();
+  const targetFrameMs = mobileTouch ? 1000 / 30 : 1000 / 60;
   let last = performance.now();
   function frame(now) {
+    if (now - last < targetFrameMs - 1) {
+      requestAnimationFrame(frame);
+      return;
+    }
     const rdt = Math.min(0.05, (now - last) / 1000);
     last = now;
     let dt = rdt;
