@@ -37,6 +37,10 @@ Os controles são iguais em todo lugar, no estilo tanque: **frente acelera, trá
 
 O código fica na seção `MODO TANQUE` do `game.js`: as missões estão em `MISSIONS`, os temas em `THEMES` e os objetos destrutíveis em `OBJ`.
 
+## Novo modo Tanques 3D (protótipo)
+
+A opção **NOVO MODO · TANQUES 3D** abre uma experiência 3D separada, sem substituir os modos existentes. Inclui cenário 3D, tanques com esteiras/rodas/torreta/canhão, disparos e dois modos locais: campanha cooperativa contra tanques inimigos e Deathmatch 1×1 em tela dividida. No computador, Jogador 1 usa **W/A/S/D**, **Q/E** para a torreta e **Espaço** para atirar; Jogador 2 usa **setas**, **,/ .** para a torreta e **Enter** para atirar. O protótipo carrega a biblioteca Three.js por CDN, portanto precisa de internet na primeira abertura e enquanto a biblioteca não estiver em cache do navegador.
+
 ## Vista isométrica
 O campo é desenhado em ângulo isométrico, sobre o cenário `public/assets/maps/arena.jpg` (muralhas, torre, bunker, barracas). A lógica do jogo continua numa grade simples 5×9; só o desenho e o toque são projetados no tabuleiro inclinado (veja `ISO`, `iso()` e `unproject()` no `game.js`). Para trocar o mapa, substitua a imagem e ajuste `ISO` (canto do tabuleiro e tamanho de uma casa).
 
